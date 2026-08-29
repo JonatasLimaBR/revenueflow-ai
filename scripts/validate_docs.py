@@ -1,12 +1,15 @@
-from pathlib import Path
 import re
 import sys
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 RULES = {
     "prd": ("PRD", {"## Objetivo"}),
     "specs": ("SPEC", {"## Objetivo", "## Critérios de aceite"}),
-    "adrs": ("ADR", {"## Status", "## Decisão", "## Alternativas consideradas", "## Consequências"}),
+    "adrs": (
+        "ADR",
+        {"## Status", "## Decisão", "## Alternativas consideradas", "## Consequências"},
+    ),
 }
 errors = []
 
