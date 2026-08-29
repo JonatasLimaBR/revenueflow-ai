@@ -10,6 +10,8 @@ description = "Autonomous WhatsApp Sales Platform"
 dependencies = [
     "pydantic>=2.7",
     "pydantic-settings>=2.4",
+    "psycopg[binary]>=3.2",
+    "psycopg-pool>=3.2",
 ]
 
 [project.optional-dependencies]
@@ -36,3 +38,4 @@ files = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
+asyncio_mode = "auto"

@@ -1,0 +1,68 @@
+[
+  {
+    "product_id": "PMP-050-PER",
+    "name": "Bomba d'água periférica 1/2CV 127V",
+    "category": "bomba d'água periférica",
+    "attrs": { "hp": 0.5, "voltage": "127V", "max_flow_lph": 2400, "inlet_mm": 25 },
+    "price_tiers": [
+      { "min_qty": 1, "unit_price": 389.90 },
+      { "min_qty": 5, "unit_price": 359.90 },
+      { "min_qty": 20, "unit_price": 329.90 }
+    ]
+  },
+  {
+    "product_id": "PMP-100-PER",
+    "name": "Bomba d'água periférica 1CV 127/220V",
+    "category": "bomba d'água periférica",
+    "attrs": { "hp": 1.0, "voltage": "127/220V", "max_flow_lph": 3600, "inlet_mm": 25 },
+    "price_tiers": [
+      { "min_qty": 1, "unit_price": 549.90 },
+      { "min_qty": 5, "unit_price": 512.90 },
+      { "min_qty": 20, "unit_price": 479.90 }
+    ]
+  },
+  {
+    "product_id": "PMP-100-CEN",
+    "name": "Bomba d'água centrífuga 1CV 220V",
+    "category": "bomba d'água centrífuga",
+    "attrs": { "hp": 1.0, "voltage": "220V", "max_flow_lph": 9000, "inlet_mm": 32 },
+    "price_tiers": [
+      { "min_qty": 1, "unit_price": 729.90 },
+      { "min_qty": 4, "unit_price": 689.90 },
+      { "min_qty": 12, "unit_price": 649.90 }
+    ]
+  },
+  {
+    "product_id": "PMP-200-CEN",
+    "name": "Bomba d'água centrífuga 2CV 220V",
+    "category": "bomba d'água centrífuga",
+    "attrs": { "hp": 2.0, "voltage": "220V", "max_flow_lph": 15000, "inlet_mm": 50 },
+    "price_tiers": [
+      { "min_qty": 1, "unit_price": 1189.90 },
+      { "min_qty": 4, "unit_price": 1119.90 },
+      { "min_qty": 10, "unit_price": 1049.90 }
+    ]
+  },
+  {
+    "product_id": "PMP-075-SUB",
+    "name": "Bomba d'água submersa 3/4CV 220V para poço",
+    "category": "bomba d'água submersa",
+    "attrs": { "hp": 0.75, "voltage": "220V", "max_flow_lph": 4200, "outlet_mm": 25 },
+    "price_tiers": [
+      { "min_qty": 1, "unit_price": 899.90 },
+      { "min_qty": 3, "unit_price": 849.90 },
+      { "min_qty": 10, "unit_price": 799.90 }
+    ]
+  },
+  {
+    "product_id": "PMP-300-PRE",
+    "name": "Bomba d'água pressurizadora 3CV 220V trifásica",
+    "category": "bomba d'água pressurizadora",
+    "attrs": { "hp": 3.0, "voltage": "220V", "max_flow_lph": 21000, "inlet_mm": 50 },
+    "price_tiers": [
+      { "min_qty": 1, "unit_price": 2149.90 },
+      { "min_qty": 3, "unit_price": 2039.90 },
+      { "min_qty": 8, "unit_price": 1929.90 }
+    ]
+  }
+]

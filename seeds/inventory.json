@@ -1,0 +1,8 @@
+[
+  { "product_id": "PMP-050-PER", "available": 120, "reserved": 12, "lead_time_days": 2 },
+  { "product_id": "PMP-100-PER", "available": 45, "reserved": 8, "lead_time_days": 3 },
+  { "product_id": "PMP-100-CEN", "available": 6, "reserved": 4, "lead_time_days": 7 },
+  { "product_id": "PMP-200-CEN", "available": 0, "reserved": 0, "lead_time_days": 21 },
+  { "product_id": "PMP-075-SUB", "available": 18, "reserved": 2, "lead_time_days": 5 },
+  { "product_id": "PMP-300-PRE", "available": 2, "reserved": 1, "lead_time_days": 30 }
+]
