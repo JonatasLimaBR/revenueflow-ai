@@ -23,6 +23,9 @@ dev = [
 events = [
     "google-cloud-pubsub>=2.21",
 ]
+llm = [
+    "google-genai>=0.8",
+]
 observability = [
     "langfuse>=2.50",
     "opentelemetry-sdk>=1.27",
@@ -49,6 +52,10 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = ["google.cloud.*", "google.cloud.pubsub_v1", "google.pubsub_v1.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["google", "google.genai", "google.genai.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

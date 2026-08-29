@@ -34,3 +34,14 @@ async def conn(_schema: None) -> AsyncIterator[AsyncConnection[Any]]:
             yield connection
     finally:
         await close_pool()
+
+
+@pytest_asyncio.fixture
+async def db(_schema: None) -> AsyncIterator[None]:
+    await open_pool()
+    try:
+        async with get_pool().connection() as connection:
+            await connection.execute(_TRUNCATE)
+        yield
+    finally:
+        await close_pool()
