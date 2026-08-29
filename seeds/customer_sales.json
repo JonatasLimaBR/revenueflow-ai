@@ -1,0 +1,20 @@
+[
+  {
+    "customer_id": "CUST-001",
+    "product_id": "PMP-100-PER",
+    "last_qty": 10,
+    "last_order_at": "2026-07-14T13:20:00Z"
+  },
+  {
+    "customer_id": "CUST-001",
+    "product_id": "PMP-100-CEN",
+    "last_qty": 4,
+    "last_order_at": "2026-05-02T09:05:00Z"
+  },
+  {
+    "customer_id": "CUST-001",
+    "product_id": "PMP-050-PER",
+    "last_qty": 25,
+    "last_order_at": "2026-02-19T16:45:00Z"
+  }
+]
