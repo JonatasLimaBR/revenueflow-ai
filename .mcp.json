@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "gcp-cli": {
+      "type": "http",
+      "url": "https://cloudcli.googleapis.com/mcp"
+    }
+  }
+}

@@ -1,0 +1,9 @@
+---
+description: RevenueFlow AI repository rules
+alwaysApply: true
+---
+
+The authoritative instructions are in `AGENTS.md`.
+Read `AGENTS.md` before modifying code.
+Do not override accepted ADRs.
+Never use an LLM as source of truth for price, inventory, order, payment, or customer identity.
