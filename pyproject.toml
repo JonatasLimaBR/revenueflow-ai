@@ -12,12 +12,16 @@ dependencies = [
     "pydantic-settings>=2.4",
     "psycopg[binary]>=3.2",
     "psycopg-pool>=3.2",
+    "httpx>=0.27",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8",
     "pytest-asyncio>=0.23",
+]
+events = [
+    "google-cloud-pubsub>=2.21",
 ]
 observability = [
     "langfuse>=2.50",
@@ -41,6 +45,10 @@ files = ["src"]
 
 [[tool.mypy.overrides]]
 module = ["langfuse", "langfuse.*", "opentelemetry", "opentelemetry.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["google.cloud.*", "google.cloud.pubsub_v1", "google.pubsub_v1.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
