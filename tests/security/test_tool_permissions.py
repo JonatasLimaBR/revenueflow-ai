@@ -1,3 +1,8 @@
+from langgraph.checkpoint.memory import MemorySaver
+
+from revenueflow.agents.graph import build_graph, graph_tool_names
+from revenueflow.tools.registry import RECOMMENDATION_TOOL_NAMES
+
 ALLOWED = {
     "recommendation": {
         "search_products",
@@ -29,3 +34,28 @@ def test_no_agent_has_generic_set_discount() -> None:
 
 def test_opportunity_agent_cannot_send_whatsapp_directly() -> None:
     assert "send_whatsapp_direct" not in ALLOWED["opportunity"]
+
+
+def test_recommendation_tool_names_are_exact() -> None:
+    assert RECOMMENDATION_TOOL_NAMES == {
+        "search_products",
+        "get_product_details",
+        "get_inventory",
+        "get_customer_sales_context",
+    }
+
+
+def test_recommendation_tool_names_disjoint_from_write_tools() -> None:
+    write_tools = {
+        "create_quote",
+        "create_order",
+        "create_payment_sandbox",
+        "set_discount",
+        "send_whatsapp_direct",
+    }
+    assert RECOMMENDATION_TOOL_NAMES.isdisjoint(write_tools)
+
+
+def test_graph_reachable_tools_stay_within_registry() -> None:
+    compiled = build_graph(MemorySaver())
+    assert graph_tool_names(compiled) <= set(RECOMMENDATION_TOOL_NAMES)

@@ -14,6 +14,17 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 """
 
 
+def setup_checkpointer(database_url: str) -> None:
+    try:
+        from langgraph.checkpoint.postgres import PostgresSaver
+    except ImportError:
+        print("langgraph not installed; skipping checkpoint setup")
+        return
+    with PostgresSaver.from_conn_string(database_url) as saver:
+        saver.setup()
+    print("langgraph checkpoint tables ready")
+
+
 def main() -> int:
     settings = get_settings()
     with psycopg.connect(settings.database_url) as conn:
@@ -38,6 +49,7 @@ def main() -> int:
             conn.commit()
             print(f"applied {version}")
 
+    setup_checkpointer(settings.database_url)
     return 0
 
 
