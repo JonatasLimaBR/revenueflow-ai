@@ -14,3 +14,6 @@ build/
 *.egg-info/
 service-account*.json
 credentials*.json
+
+# SDD workflow artifacts (local working files, not versioned)
+.claude/sdd/
