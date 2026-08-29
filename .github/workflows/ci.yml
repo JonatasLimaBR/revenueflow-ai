@@ -37,7 +37,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: python -m pip install mypy
+      - run: python -m pip install -e . mypy
       - run: mypy src
 
   tests:
@@ -47,7 +47,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: python -m pip install pytest
+      - run: python -m pip install -e ".[dev]"
       - run: pytest -q
 
   security:

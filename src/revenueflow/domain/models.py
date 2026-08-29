@@ -1,0 +1,63 @@
+from dataclasses import dataclass
+from datetime import datetime
+from enum import StrEnum
+
+
+class SessionStatus(StrEnum):
+    OPEN = "OPEN"
+    WAITING_CUSTOMER = "WAITING_CUSTOMER"
+    CLOSED = "CLOSED"
+
+
+class LeadStatus(StrEnum):
+    NEW = "NEW"
+    QUALIFYING = "QUALIFYING"
+    QUALIFIED = "QUALIFIED"
+    PROPOSAL = "PROPOSAL"
+    WON = "WON"
+    LOST = "LOST"
+
+
+class Intent(StrEnum):
+    GREETING = "greeting"
+    PRODUCT_SEARCH = "product_search"
+    RECOMMENDATION = "recommendation"
+    STOCK_REQUEST = "stock_request"
+    PRICE_REQUEST = "price_request"
+    QUOTE_REQUEST = "quote_request"
+    NEGOTIATION = "negotiation"
+    ORDER_REQUEST = "order_request"
+    ORDER_STATUS = "order_status"
+    CANCELLATION = "cancellation"
+    HUMAN_SUPPORT = "human_support"
+    UNKNOWN = "unknown"
+
+
+@dataclass(slots=True)
+class NormalizedEvent:
+    event_id: str
+    occurred_at: datetime
+    phone: str
+    message_id: str
+    message_type: str
+    message_text: str
+
+
+@dataclass(slots=True)
+class ConversationSession:
+    conversation_id: str
+    phone: str
+    status: SessionStatus
+    last_interaction: datetime
+    current_intent: Intent | None = None
+    current_agent: str | None = None
+    customer_id: str | None = None
+    lead_id: str | None = None
+
+
+@dataclass(slots=True)
+class Lead:
+    lead_id: str
+    phone: str
+    status: LeadStatus
+    created_at: datetime

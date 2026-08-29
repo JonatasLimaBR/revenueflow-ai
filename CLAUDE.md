@@ -109,6 +109,16 @@ testes
 PR
 ```
 
+## Fluxo de contribuição / CI
+
+- A `main` é protegida (`enforce_admins`): **sem push direto**, inclusive para admins.
+- Toda tarefa de desenvolvimento cria uma branch nova (`feat/…`, `fix/…`, `chore/…`) e entra por **PR**. Merge é **squash-only**; o título do PR vira a mensagem do commit e precisa seguir Conventional Commits (`feat|fix|test|docs|refactor|chore|ci`).
+- 7 checks obrigatórios e "strict" (branch atualizada): `docs`, `lint`, `typecheck`, `tests`, `security`, `pre-commit`, `pr-title`. 0 aprovações humanas exigidas — o portão é o CI.
+- Portão local: `pre-commit install --install-hooks` ativa ruff, ruff-format, gitleaks, higiene de arquivos e `scripts/check_commit_msg.py` (Conventional Commits). O job `pre-commit` do CI roda os mesmos hooks.
+- Comandos equivalentes ao CI: `python scripts/validate_docs.py`, `ruff check .`, `ruff format --check .`, `mypy src`, `pytest -q`, `pre-commit run --all-files`.
+- Dev harness (em construção — fatia WhatsApp inbound): **Docker Compose + Makefile** (`make up/down/migrate/seed/lint/test/run`); o CI usa os mesmos comandos por trás dos alvos.
+- Artefatos do fluxo SDD (`/brainstorm`, `/define`, `/design`, `/build`) ficam em `.claude/sdd/` e **não são versionados** (git-ignored).
+
 ## Catálogo documental obrigatório
 
 Claude deve localizar e ler os documentos relacionados antes de implementar.
