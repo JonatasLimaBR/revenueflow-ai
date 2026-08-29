@@ -1,8 +1,25 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "revenueflow-ai"
 version = "0.1.0"
 requires-python = ">=3.12"
 description = "Autonomous WhatsApp Sales Platform"
+dependencies = [
+    "pydantic>=2.7",
+    "pydantic-settings>=2.4",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=0.23",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [tool.ruff]
 line-length = 100
