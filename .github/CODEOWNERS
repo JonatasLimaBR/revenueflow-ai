@@ -1,0 +1,11 @@
+# Default owner for everything in the repo.
+* @JonatasLimaBR
+
+# Engineering contract and architecture decisions.
+/AGENTS.md @JonatasLimaBR
+/CLAUDE.md @JonatasLimaBR
+/docs/adrs/ @JonatasLimaBR
+
+# CI and branch-protection surface.
+/.github/ @JonatasLimaBR
+/.pre-commit-config.yaml @JonatasLimaBR
