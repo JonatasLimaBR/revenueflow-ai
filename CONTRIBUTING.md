@@ -35,6 +35,23 @@ pytest -q
 pre-commit run --all-files
 ```
 
+Ou, com o harness Docker (ADR-046): `make check` roda tudo; `make up` sobe a
+stack local (`postgres`, emulador do Pub/Sub, Langfuse, `app`).
+
+## Trabalho paralelo (múltiplos agentes)
+O desenvolvimento pode envolver vários agentes trabalhando ao mesmo tempo. Para
+não colidirem:
+
+- **Uma branch e um PR por tarefa**, com escopo de arquivos disjunto entre PRs
+  abertos simultaneamente.
+- Branches curtas: rebase na `main` antes do merge (os checks `strict` já exigem
+  a branch atualizada).
+- O corpo do PR referencia a PRD/SPEC/ADR que implementa.
+- Um arquivo é editado por um PR de cada vez; se dois precisam do mesmo arquivo,
+  serializam.
+- Cada PR é verificável e mergeável de forma independente (`ruff` + `mypy` +
+  `pytest` verdes localmente antes de abrir).
+
 ## Commits e título de PR
 Conventional Commits, tipos: `feat`, `fix`, `test`, `docs`, `refactor`,
 `chore`, `ci`. O merge é **squash-only**; o título do PR precisa seguir o

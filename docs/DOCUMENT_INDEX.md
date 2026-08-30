@@ -99,3 +99,8 @@
 - [ADR-039 — Persistent Interrupt Before Irreversible Actions](adrs/adr-039-persistent-interrupt-before-irreversible-actions.md)
 - [ADR-040 — Observability From First Functional Slice](adrs/adr-040-observability-from-first-functional-slice.md)
 - [ADR-041 — Independent Spec Verification Ritual](adrs/adr-041-independent-spec-verification-ritual.md)
+- [ADR-042 — Google Cloud CLI Remote MCP for Developer Harness](adrs/adr-042-google-cloud-cli-remote-mcp-for-developer-harness.md)
+- [ADR-043 — Claude Code Hooks Block Destructive GCP Actions](adrs/adr-043-claude-code-hooks-block-destructive-gcp-actions.md)
+- [ADR-044 — Pub/Sub para processamento assíncrono do webhook, atrás de uma porta EventPublisher](adrs/adr-044-pub-sub-async-webhook-with-publisher-port.md)
+- [ADR-045 — Langfuse self-hosted atrás de uma porta Tracer](adrs/adr-045-langfuse-self-hosted-behind-tracer-port.md)
+- [ADR-046 — Docker Compose e Makefile como harness de desenvolvimento](adrs/adr-046-docker-compose-and-makefile-dev-harness.md)
