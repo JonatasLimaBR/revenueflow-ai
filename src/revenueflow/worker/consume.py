@@ -70,6 +70,7 @@ async def process_event(
             "customer_text": text,
             "customer_id": customer_id,
             "lead_id": lead_id,
+            "turn_id": envelope.event_id,
         }
         result = await get_graph().ainvoke(
             state_in, config={"configurable": {"thread_id": session.conversation_id}}
@@ -85,7 +86,7 @@ async def process_event(
                 phone=phone, text=reply, dispatch_key=dispatch_key
             )
 
-        get_tracer().end(outcome="replied")
+        get_tracer().end(outcome=str(result.get("final_outcome", "replied")))
         return True
     except Exception:
         _LOGGER.exception("process_event failed for %s", envelope.event_id)
