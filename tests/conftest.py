@@ -5,28 +5,46 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any
 
+import psycopg
 import pytest
 import pytest_asyncio
 from psycopg import AsyncConnection
 
+from revenueflow.config import get_settings
 from revenueflow.repositories.db import close_pool, get_pool, open_pool
 
 _ROOT = Path(__file__).resolve().parents[1]
 _TRUNCATE = "TRUNCATE processed_event, dispatch, conversation_session, lead CASCADE"
+_NO_DB_REASON = "no PostgreSQL reachable at DATABASE_URL (run `make db-up`)"
 
 
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 
+def _database_reachable() -> bool:
+    try:
+        with psycopg.connect(get_settings().database_url, connect_timeout=2):
+            return True
+    except (psycopg.OperationalError, OSError):
+        return False
+
+
+_DB_REACHABLE = _database_reachable()
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _schema() -> None:
+    if not _DB_REACHABLE:
+        return
     for script in ("scripts/migrate.py", "scripts/seed.py"):
         subprocess.run([sys.executable, script], check=True, cwd=_ROOT)
 
 
 @pytest_asyncio.fixture
 async def conn(_schema: None) -> AsyncIterator[AsyncConnection[Any]]:
+    if not _DB_REACHABLE:
+        pytest.skip(_NO_DB_REASON)
     await open_pool()
     try:
         async with get_pool().connection() as connection:
@@ -38,6 +56,8 @@ async def conn(_schema: None) -> AsyncIterator[AsyncConnection[Any]]:
 
 @pytest_asyncio.fixture
 async def db(_schema: None) -> AsyncIterator[None]:
+    if not _DB_REACHABLE:
+        pytest.skip(_NO_DB_REASON)
     await open_pool()
     try:
         async with get_pool().connection() as connection:
