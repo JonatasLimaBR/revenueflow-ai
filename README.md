@@ -148,6 +148,7 @@ A `main` deve ser protegida, mudanças entram por Pull Request e o workflow de C
 ### Controles agentic adicionais
 - [Arquitetura Agentic](docs/engineering/agentic-architecture.md)
 - [Matriz de Permissões de Tools](docs/engineering/tool-permission-matrix.md)
+- [Deploy no GCP — Runbook](docs/engineering/deploy.md)
 - [Ritual `/verificar-spec`](.codex/commands/verificar-spec.md)
 - [Ritual `/verificar-risco`](.codex/commands/verificar-risco.md)
 
