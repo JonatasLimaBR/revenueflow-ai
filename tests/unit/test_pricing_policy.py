@@ -2,7 +2,7 @@ from decimal import Decimal
 
 import pytest
 
-from revenueflow.domain.models import PolicyDecision
+from revenueflow.domain.models import PolicyDecision, PolicyReason
 from revenueflow.policies.pricing_policy import evaluate
 
 _ZERO = Decimal("0")
@@ -55,6 +55,7 @@ def test_evaluate_matrix(
     assert decision.requires_approval is requires_approval
     assert decision.allowed is (not requires_approval)
     assert decision.max_allowed >= _ZERO
+    assert isinstance(decision.reason, PolicyReason)
     assert decision.reason in _REASONS
     if under_margin:
         assert decision.reason == "margin_below_minimum"

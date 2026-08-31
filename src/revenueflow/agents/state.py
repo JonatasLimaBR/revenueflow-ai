@@ -18,6 +18,7 @@ class TurnState(TurnInput, total=False):
     customer_id: str | None
     lead_id: str | None
     turn_id: str
+    current_agent: str | None
     intent: str
     confidence: float
     tool_results: list[dict[str, Any]]

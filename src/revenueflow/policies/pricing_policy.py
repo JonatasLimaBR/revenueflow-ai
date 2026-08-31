@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from revenueflow.domain.models import PolicyDecision
+from revenueflow.domain.models import PolicyDecision, PolicyReason
 
 _ZERO = Decimal("0")
 _ONE = Decimal("1")
@@ -34,11 +34,11 @@ def evaluate(
         max_by_margin = _ZERO
     max_allowed = max(_ZERO, min(maximum_discount, max_by_margin))
     reason = (
-        "margin_below_minimum"
+        PolicyReason.MARGIN_BELOW_MINIMUM
         if under_margin
-        else "discount_out_of_policy"
+        else PolicyReason.DISCOUNT_OUT_OF_POLICY
         if over_discount
-        else "within_policy"
+        else PolicyReason.WITHIN_POLICY
     )
     return PolicyDecision(
         allowed=not requires_approval,

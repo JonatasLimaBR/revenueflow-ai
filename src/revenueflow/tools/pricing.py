@@ -78,5 +78,5 @@ async def propose_allowed_discount(
         "max_allowed": str(decision.max_allowed),
         "resulting_margin": str(decision.resulting_margin),
         "requires_approval": decision.requires_approval,
-        "reason": decision.reason,
+        "reason": decision.reason.value,
     }
