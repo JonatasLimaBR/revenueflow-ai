@@ -90,13 +90,19 @@ class MarginBreakdown:
     margin: Decimal
 
 
+class PolicyReason(StrEnum):
+    MARGIN_BELOW_MINIMUM = "margin_below_minimum"
+    DISCOUNT_OUT_OF_POLICY = "discount_out_of_policy"
+    WITHIN_POLICY = "within_policy"
+
+
 @dataclass(frozen=True, slots=True)
 class PolicyDecision:
     allowed: bool
     max_allowed: Decimal
     resulting_margin: Decimal
     requires_approval: bool
-    reason: str
+    reason: PolicyReason
 
 
 @dataclass(slots=True)

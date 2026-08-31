@@ -76,7 +76,11 @@ async def process_event(
             state_in, config={"configurable": {"thread_id": session.conversation_id}}
         )
         reply = str(result["reply"])
-        await record_turn(session.conversation_id, intent=Intent(result["intent"]))
+        await record_turn(
+            session.conversation_id,
+            intent=Intent(result["intent"]),
+            agent=result.get("current_agent"),
+        )
 
         dispatch_key = f"{session.conversation_id}:{envelope.event_id}"
         async with unit_of_work() as conn:

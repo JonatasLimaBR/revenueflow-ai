@@ -21,7 +21,7 @@ from revenueflow.domain.models import Approval, ApprovalStatus
 from revenueflow.observability import get_tracer
 from revenueflow.repositories import approval as approval_repo
 from revenueflow.repositories.db import unit_of_work
-from revenueflow.services import extract_discount
+from revenueflow.services import extract_price_ask
 from revenueflow.tools import pricing as tools_pricing
 
 _ONE = Decimal("1")
@@ -50,18 +50,38 @@ async def negotiation_node(state: TurnState) -> dict[str, Any]:
     with get_tracer().span("node.negotiation"):
         product_id = _product_id(state)
         if product_id is None:
-            return {"reply": _CLARIFY_REPLY, "final_outcome": "clarify"}
+            return {
+                "reply": _CLARIFY_REPLY,
+                "final_outcome": "clarify",
+                "current_agent": "negotiation",
+            }
 
-        requested, quantity = extract_discount(state["customer_text"])
-        qty = quantity or 1
+        ask = extract_price_ask(state["customer_text"])
+        qty = ask.quantity or 1
         customer_ref = state.get("customer_id")
         quote = await tools_pricing.get_price(customer_ref, product_id, qty)
         valid_until = quote["valid_until"]
 
+        requested: Decimal | None
+        if ask.discount is not None:
+            requested = ask.discount
+        elif ask.target_price is not None:
+            requested = max(
+                Decimal("0"),
+                _ONE - Decimal(str(ask.target_price)) / Decimal(quote["customer_price"]),
+            )
+        else:
+            requested = None
+
         if requested is None:
             price = Decimal(quote["customer_price"]).quantize(_CENT)
             reply = f"O preço para {qty} un é R$ {price} (válido até {valid_until})."
-            return {"reply": reply, "final_outcome": "quoted", "price_quote": quote}
+            return {
+                "reply": reply,
+                "final_outcome": "quoted",
+                "price_quote": quote,
+                "current_agent": "negotiation",
+            }
 
         margin = await tools_pricing.calculate_margin(
             quote["customer_price"], quote["unit_cost"], str(requested)
@@ -84,6 +104,7 @@ async def negotiation_node(state: TurnState) -> dict[str, Any]:
                 "final_outcome": "proposed",
                 "price_quote": quote,
                 "policy_decision": decision,
+                "current_agent": "negotiation",
             }
 
         approval = Approval(
@@ -106,6 +127,7 @@ async def negotiation_node(state: TurnState) -> dict[str, Any]:
         "pending_approval_id": approval.approval_id,
         "policy_decision": decision,
         "final_outcome": "pending_approval",
+        "current_agent": "negotiation",
     }
 
 
