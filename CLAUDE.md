@@ -14,6 +14,53 @@ Claude Code é um harness suportado deste repositório. O contrato de engenharia
 6. testes existentes
 7. código
 
+## Estado da implementação
+
+A primeira fatia vertical — **WHATSAPP_INBOUND_SLICE** — foi entregue em 2026-08-31 (modo
+`LLM_STUB`; PRs #3–#10). O código de aplicação **existe** e não é mais scaffolding.
+
+Fluxo que roda: `POST /webhook/whatsapp` (HMAC) → Pub/Sub `message_received` → `process_event`
+idempotente → sessão + lead provisório → grafo LangGraph `classify_intent → supervisor →
+recommendation → respond` (checkpointer PostgreSQL) → resposta ancorada nos repositórios
+simulados → `ChannelOutbound.send`.
+
+Mapa de `src/revenueflow/`:
+
+| Pacote | Papel |
+|---|---|
+| `config` | `Settings` tipado (pydantic-settings) + flags `CHANNEL_OUTBOUND`/`TRACER_SINK`/`LLM_STUB` |
+| `domain` | erros tipados; enums `SessionStatus`/`LeadStatus`/`Intent`; dataclasses de entidade |
+| `observability` | `mask()` de PII; porta `Tracer` (`noop`/`langfuse`/`otel`); `cost_usd()` |
+| `events` | `EventEnvelope`; porta `EventPublisher` (`in_memory`/`pubsub`) |
+| `adapters` | portas de canal; `verify_signature` + `parse_inbound`; `WhatsAppOutbound` + `FakeOutbound` |
+| `repositories` | pool async psycopg; `processed_event`/`dispatch` (idempotência); `session`/`lead`; `sim_*` |
+| `services` | `ingest`, `session`, `identity`, `prompts`, `llm` (stub + Gemini lazy), `intent`, `respond` |
+| `tools` | 4 tools read-only + `registry` (fronteira de segurança — nenhuma tool de escrita) |
+| `agents` | `TurnState`; `recommendation_node`; `build_graph` (checkpointer Postgres) |
+| `api` | `webhook` (GET verify + POST 202), `health` (`/healthz`) |
+| `worker` | `process_event` (consumidor idempotente), `subscriber` (loop Pub/Sub real) |
+
+Portas com impl `noop`/`in_memory`/`fake` por default: a suíte roda só com `postgres:16`. Os
+caminhos reais (`google-genai`, `google-cloud-pubsub`, `httpx` para a Graph API, `langfuse`) são
+imports lazy atrás de flags/extras opcionais.
+
+Modo `LLM_STUB` (`llm_stub=True` por default): intent e resposta usam um stub determinístico; o
+`google-genai` está escrito mas desligado. O upgrade para Vertex real é a feature seguinte
+`WHATSAPP_INBOUND_VERTEX`.
+
+### Como rodar
+
+```bash
+make up          # sobe app + postgres + emulador Pub/Sub + Langfuse (docker-compose)
+make run         # roda a API local com autoreload (precisa de postgres)
+make migrate     # aplica migrations + setup do checkpointer LangGraph
+make seed        # popula o catálogo/estoque simulado
+make check       # lint + typecheck + testes + validate_docs (tudo que o CI roda)
+```
+
+`make test` sobe `postgres` via compose e roda `pytest -q` (94 testes: unit + integration +
+security + ai_eval).
+
 ## Invariantes
 
 - LLM não é fonte de verdade para preço, estoque, margem, identidade, pedido ou pagamento.
