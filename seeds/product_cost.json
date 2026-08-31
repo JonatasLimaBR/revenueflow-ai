@@ -1,0 +1,8 @@
+[
+  { "product_id": "PMP-050-PER", "unit_cost": 197.94, "min_margin_pct": 0.15 },
+  { "product_id": "PMP-100-PER", "unit_cost": 287.94, "min_margin_pct": 0.15 },
+  { "product_id": "PMP-100-CEN", "unit_cost": 389.94, "min_margin_pct": 0.15 },
+  { "product_id": "PMP-200-CEN", "unit_cost": 629.94, "min_margin_pct": 0.15 },
+  { "product_id": "PMP-075-SUB", "unit_cost": 479.94, "min_margin_pct": 0.15 },
+  { "product_id": "PMP-300-PRE", "unit_cost": 1157.94, "min_margin_pct": 0.15 }
+]

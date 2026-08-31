@@ -1,4 +1,5 @@
 import json
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
@@ -36,6 +37,18 @@ ON CONFLICT (customer_id, product_id) DO UPDATE SET
     last_order_at = EXCLUDED.last_order_at
 """
 
+UPDATE_PRODUCT_COST = """
+UPDATE sim_product SET unit_cost = %s, min_margin_pct = %s WHERE product_id = %s
+"""
+
+UPSERT_CUSTOMER_PRICING = """
+INSERT INTO sim_customer_pricing (customer_id, product_id, negotiated_price, max_discount_pct)
+VALUES (%s, %s, %s, %s)
+ON CONFLICT (customer_id, product_id) DO UPDATE SET
+    negotiated_price = EXCLUDED.negotiated_price,
+    max_discount_pct = EXCLUDED.max_discount_pct
+"""
+
 
 def _load(name: str) -> list[dict[str, Any]]:
     payload: list[dict[str, Any]] = json.loads((SEEDS_DIR / name).read_text(encoding="utf-8"))
@@ -46,6 +59,8 @@ def main() -> int:
     products = _load("products.json")
     inventory = _load("inventory.json")
     customer_sales = _load("customer_sales.json")
+    product_cost = _load("product_cost.json")
+    customer_pricing = _load("customer_pricing.json")
 
     settings = get_settings()
     with psycopg.connect(settings.database_url) as conn:
@@ -81,11 +96,31 @@ def main() -> int:
                         sale["last_order_at"],
                     ),
                 )
+            for cost in product_cost:
+                cur.execute(
+                    UPDATE_PRODUCT_COST,
+                    (
+                        Decimal(str(cost["unit_cost"])),
+                        Decimal(str(cost["min_margin_pct"])),
+                        cost["product_id"],
+                    ),
+                )
+            for pricing in customer_pricing:
+                cur.execute(
+                    UPSERT_CUSTOMER_PRICING,
+                    (
+                        pricing["customer_id"],
+                        pricing["product_id"],
+                        Decimal(str(pricing["negotiated_price"])),
+                        Decimal(str(pricing["max_discount_pct"])),
+                    ),
+                )
         conn.commit()
 
     print(
         f"seeded sim_product={len(products)} sim_inventory={len(inventory)} "
-        f"sim_customer_sales={len(customer_sales)}"
+        f"sim_customer_sales={len(customer_sales)} product_cost={len(product_cost)} "
+        f"sim_customer_pricing={len(customer_pricing)}"
     )
     return 0
 

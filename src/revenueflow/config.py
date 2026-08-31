@@ -1,3 +1,4 @@
+from decimal import Decimal
 from functools import lru_cache
 from typing import Literal
 
@@ -18,6 +19,9 @@ class Settings(BaseSettings):
     database_url: str = "postgresql://revenueflow:revenueflow@localhost:5432/revenueflow"
     pubsub_emulator_host: str = ""
     pubsub_project_id: str = "revenueflow-local"
+
+    pricing_min_margin_pct: Decimal = Decimal("0.15")
+    pricing_max_discount_pct: Decimal = Decimal("0.10")
 
     langfuse_host: str = ""
     langfuse_public_key: str = ""
