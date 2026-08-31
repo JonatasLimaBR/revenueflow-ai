@@ -19,10 +19,10 @@ credentials*.json
 .claude/sdd/
 
 # Terraform
-infra/terraform/.terraform/
-infra/terraform/.terraform.lock.hcl
-infra/terraform/*.tfstate
-infra/terraform/*.tfstate.*
-infra/terraform/*.tfplan
-infra/terraform/*.tfvars
-!infra/terraform/*.tfvars.example
+infra/terraform/**/.terraform/
+infra/terraform/**/.terraform.lock.hcl
+infra/terraform/**/*.tfstate
+infra/terraform/**/*.tfstate.*
+infra/terraform/**/*.tfplan
+infra/terraform/**/*.tfvars
+!infra/terraform/**/*.tfvars.example

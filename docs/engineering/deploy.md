@@ -2,57 +2,52 @@
 
 Provisiona o RevenueFlow no GCP a partir de `infra/terraform/` e do `Dockerfile`.
 Contexto: ADR-001 (GCP), ADR-002 (Cloud Run), ADR-004 (Cloud SQL), ADR-006 (Pub/Sub),
-ADR-027 (GCP System of Record), ADR-043 (`apply`/`destroy` nunca de agente).
+ADR-027 (GCP System of Record), ADR-043 (`apply`/`destroy` nunca de agente),
+**ADR-048 (CD via GitHub Actions + WIF, sem chave)**.
 
 Primeiro deploy roda em **`LLM_STUB=1`** (sem Gemini real). Vertex real é a feature
 `WHATSAPP_INBOUND_VERTEX`.
 
-## Fase 0 — Pré-requisitos (máquina local)
+Modelo (ADR-048): **um bootstrap manual, uma vez**; depois todo `terraform plan`/`apply` e o
+build da imagem rodam no GitHub Actions, autenticando por Workload Identity Federation —
+nenhuma chave de service account em lugar nenhum.
+
+## Fase 0 — Pré-requisitos (máquina local, humano)
 
 1. Instalar Google Cloud CLI e Terraform `>= 1.7`.
-2. `gcloud auth login` e `gcloud auth application-default login` (ADC para o Terraform).
-3. Projeto + billing:
+2. `gcloud auth login` e `gcloud auth application-default login`.
+3. Projeto + billing (precisa de billing admin):
    ```
    gcloud projects create <PROJECT_ID> --name="RevenueFlow"
+   gcloud billing accounts list
    gcloud billing projects link <PROJECT_ID> --billing-account=<BILLING_ACCOUNT>
    gcloud config set project <PROJECT_ID>
    ```
-4. Habilitar APIs (idempotente; também há `google_project_service` no Terraform):
-   ```
-   gcloud services enable run.googleapis.com sqladmin.googleapis.com \
-     pubsub.googleapis.com secretmanager.googleapis.com \
-     artifactregistry.googleapis.com aiplatform.googleapis.com \
-     cloudbuild.googleapis.com iam.googleapis.com compute.googleapis.com
-   ```
 
-## Fase 1 — Bootstrap (state) — fora do Terraform, uma vez
+## Fase 1 — Bootstrap keyless (uma vez, ADR-048)
 
-5. Bucket do state:
+4. Roda com a sua identidade de admin. Cria o bucket de state, o Workload Identity pool/provider
+   e a service account `revenueflow-deployer`:
    ```
-   gcloud storage buckets create gs://<PROJECT_ID>-tfstate --location=<REGION> --uniform-bucket-level-access
-   gcloud storage buckets update  gs://<PROJECT_ID>-tfstate --versioning
+   cd infra/terraform/bootstrap
+   terraform init
+   terraform apply -var project_id=<PROJECT_ID> -var region=<REGION>
    ```
+   (state deste módulo é local e git-ignored — ver `infra/terraform/bootstrap/README.md`.)
+5. Copie os `outputs` para as **Variables** do repo (Settings → Secrets and variables → Actions
+   → Variables): `WIF_PROVIDER`, `DEPLOY_SA`, `TF_STATE_BUCKET`, `GCP_PROJECT_ID`, `GCP_REGION`.
+6. Crie o **Environment `production`** (Settings → Environments) com você como **required
+   reviewer** — essa aprovação é a barreira do ADR-043 sobre o `terraform apply`.
 
-O Artifact Registry, as APIs e todo o resto são do Terraform (`apis.tf`,
-`artifact_registry.tf`). Só o bucket de state é bootstrap manual (chicken-and-egg).
+## Fase 2 — Daqui em diante é PR
 
-## Fase 2 — Terraform: preparar e revisar
-
-7. `cd infra/terraform`
-8. Backend GCS em `backend.tf`:
-   ```hcl
-   terraform { backend "gcs" { bucket = "<PROJECT_ID>-tfstate" prefix = "prod" } }
-   ```
-9. `terraform.tfvars` (**sem segredos**, git-ignored):
-   ```hcl
-   project_id     = "<PROJECT_ID>"
-   region         = "<REGION>"
-   image          = "<REGION>-docker.pkg.dev/<PROJECT_ID>/revenueflow/api:<SHA>"
-   ```
-10. `terraform init && terraform fmt && terraform validate && terraform plan -out plan.tfplan`
-11. Revisão: `@terraform-reviewer` (IAM least-privilege, sem secrets em tfvars,
-    `deletion_protection`, state separado por ambiente) + `@gcp-architect` (aderência aos ADRs).
-    **`apply` e `destroy` exigem aprovação humana explícita no terminal (ADR-043).**
+7. Mudanças em `infra/terraform/**` disparam `.github/workflows/terraform.yml`:
+   - **PR:** job `plan` — `init` (backend GCS via `TF_STATE_BUCKET`), `validate`, `plan`, e o
+     plan é postado como comentário no PR. Revisar com `@terraform-reviewer` (IAM
+     least-privilege, `deletion_protection`) + `@gcp-architect` (aderência aos ADRs).
+   - **Merge na `main`:** job `deploy` (`environment: production`) — build + push da imagem
+     `:<sha>` por WIF, depois `terraform apply`. Só roda **após a aprovação** do Environment.
+   O `plan`/`deploy` só executam quando `WIF_PROVIDER` está setado (senão o job é `skipped`).
 
 ## Fase 3 — Segredos
 
@@ -64,22 +59,20 @@ O Artifact Registry, as APIs e todo o resto são do Terraform (`apis.tf`,
     printf '%s' "$WA_PHONE_NUMBER_ID"| gcloud secrets versions add revenueflow-whatsapp-phone-number-id --data-file=-
     ```
 
-## Fase 4 — Build e push da imagem
+## Fase 4 — Build da imagem
 
-13. ```
-    gcloud auth configure-docker <REGION>-docker.pkg.dev
-    SHA=$(git rev-parse --short HEAD)
-    docker build -t <REGION>-docker.pkg.dev/<PROJECT_ID>/revenueflow/api:$SHA .
-    docker push  <REGION>-docker.pkg.dev/<PROJECT_ID>/revenueflow/api:$SHA
-    ```
-    (ou `gcloud builds submit`.) A imagem no Cloud Run é sempre `:<SHA>`, nunca `:latest`.
+13. É o job `deploy` do workflow: `docker build` + `docker push` para
+    `<REGION>-docker.pkg.dev/<PROJECT_ID>/revenueflow/api:<sha do commit>`, autenticando por
+    WIF. A imagem no Cloud Run é sempre `:<sha>`, nunca `:latest`. Nada manual.
 
-## Fase 5 — `terraform apply` (aprovação humana)
+## Fase 5 — `terraform apply` (via Environment `production`)
 
-14. `terraform apply plan.tfplan`. **Cloud SQL leva ~10 min.** Provisiona: service account
-    dedicada + IAM (`pubsub.publisher`, `pubsub.subscriber`, `cloudsql.client`,
-    `secretmanager.secretAccessor`, `aiplatform.user`), tópico + subscription Pub/Sub,
-    instância + database Cloud SQL, secrets, serviço Cloud Run v2.
+14. No merge à `main`, o job `deploy` fica pendente até você **aprovar o Environment
+    `production`** (ADR-043). Aprovado, roda `terraform apply` (que também atualiza o Cloud Run
+    com a nova imagem). **Cloud SQL leva ~10 min no primeiro apply.** Provisiona: service
+    account de runtime + IAM (pubsub/cloudsql/secretAccessor, escopados), tópico + DLQ +
+    subscription Pub/Sub `revenueflow.messages`, instância + database Cloud SQL, secrets,
+    serviço Cloud Run v2.
 
 ## Fase 6 — Migrar o banco
 
@@ -119,22 +112,23 @@ O Artifact Registry, as APIs e todo o resto são do Terraform (`apis.tf`,
 
 ## Fase 10 — CI/CD
 
-22. Trigger do Cloud Build em merge na `main`:
-    `build → push :<sha> → terraform plan (gated) → terraform apply → gcloud run deploy`.
-    Deploy nunca automático sem gate humano.
+22. `.github/workflows/terraform.yml` (ADR-048): `plan` em PR que toca `infra/terraform/**`
+    (comentado no PR); `deploy` em merge na `main` — build+push da imagem por WIF, depois
+    `terraform apply`, gated pelo Environment `production`. `terraform apply` atualiza o Cloud
+    Run com a nova imagem — não há `gcloud run deploy` separado.
 
 ---
 
 ## O que ainda falta antes de um deploy funcional
 
-- **App:** `main.lifespan` precisa iniciar `worker.subscriber.run_subscriber()` (ADR-047).
-  Sem isso o serviço publica e não consome. PR de código separado.
-- **Terraform:** rodar `terraform init/fmt/validate/plan` numa máquina com credenciais
-  (não foi possível aqui — sem binário). Revisar o `plan` com `@terraform-reviewer`.
+- **Bootstrap (Fase 1):** rodar `infra/terraform/bootstrap` uma vez e setar as 5 Variables +
+  o Environment `production` no repo.
+- **Terraform:** o primeiro `plan` no workflow (num projeto real) + revisão `@terraform-reviewer`.
 - **Segredos:** popular as 6 versões (`gcloud secrets versions add`) — 4 WhatsApp sempre, 2
   Langfuse se `tracer_sink=langfuse`.
 - **Langfuse:** decidir hospedagem (Cloud Run próprio vs SaaS) — enquanto isso `tracer_sink=noop`.
-- **CI/CD:** o pipeline do Cloud Build (Fase 10) ainda não existe.
+- **Billing budget:** o `google_billing_budget` precisa de binding no billing account para a SA
+  `deployer`, ou fica manual.
 - **VPC/private IP** para Cloud SQL, `availability_type=REGIONAL`, uptime check + alerta —
   trade-offs de V1 aceitos; ver `infra/terraform/README.md`.
 
