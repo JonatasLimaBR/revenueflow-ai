@@ -17,7 +17,14 @@ class TurnState(TurnInput, total=False):
 
     customer_id: str | None
     lead_id: str | None
+    turn_id: str
     intent: str
     confidence: float
     tool_results: list[dict[str, Any]]
+    requested_discount: str | None
+    requested_quantity: int | None
+    price_quote: dict[str, Any]
+    policy_decision: dict[str, Any]
+    pending_approval_id: str | None
+    final_outcome: str
     reply: str

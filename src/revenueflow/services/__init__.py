@@ -8,6 +8,7 @@ from revenueflow.services.identity import resolve
 from revenueflow.services.ingest import ingest_message
 from revenueflow.services.intent import classify
 from revenueflow.services.llm import gemini_json, gemini_text
+from revenueflow.services.negotiation import extract_discount
 from revenueflow.services.prompts import PROMPTS, Prompt
 from revenueflow.services.respond import generate
 from revenueflow.services.session import (
@@ -22,6 +23,7 @@ __all__ = [
     "Prompt",
     "classify",
     "close",
+    "extract_discount",
     "gemini_json",
     "gemini_text",
     "generate",
