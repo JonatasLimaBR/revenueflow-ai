@@ -45,6 +45,9 @@ async def run_subscriber() -> None:
     _LOGGER.info("subscriber listening on %s", subscription_path)
     try:
         await loop.run_in_executor(None, streaming_pull.result)
+    except asyncio.CancelledError:
+        streaming_pull.cancel()
+        raise
     except Exception:
         streaming_pull.cancel()
         _LOGGER.exception("subscriber stream stopped")

@@ -7,6 +7,8 @@ consumer and the webhook share one graph instance.
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -18,6 +20,7 @@ from revenueflow.api import health_router, webhook_router
 from revenueflow.config import get_settings
 from revenueflow.repositories.db import close_pool, open_pool
 from revenueflow.worker import set_graph
+from revenueflow.worker.subscriber import run_subscriber
 
 
 @asynccontextmanager
@@ -28,7 +31,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     async with AsyncPostgresSaver.from_conn_string(get_settings().database_url) as saver:
         await saver.setup()
         set_graph(build_graph(saver))
-        yield
+        consumer: asyncio.Task[None] | None = None
+        if get_settings().run_consumer:
+            consumer = asyncio.create_task(run_subscriber(), name="pubsub-consumer")
+        try:
+            yield
+        finally:
+            if consumer is not None:
+                consumer.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await consumer
     await close_pool()
 
 

@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     tracer_sink: TracerSink = "noop"
     llm_stub: bool = True
     gemini_model: str = "gemini-2.0-flash"
+    run_consumer: bool = False
 
     database_url: str = "postgresql://revenueflow:revenueflow@localhost:5432/revenueflow"
     pubsub_emulator_host: str = ""
