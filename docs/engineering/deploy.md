@@ -25,17 +25,16 @@ Primeiro deploy roda em **`LLM_STUB=1`** (sem Gemini real). Vertex real é a fea
      cloudbuild.googleapis.com iam.googleapis.com compute.googleapis.com
    ```
 
-## Fase 1 — Bootstrap (state + registry) — fora do Terraform, uma vez
+## Fase 1 — Bootstrap (state) — fora do Terraform, uma vez
 
 5. Bucket do state:
    ```
    gcloud storage buckets create gs://<PROJECT_ID>-tfstate --location=<REGION> --uniform-bucket-level-access
    gcloud storage buckets update  gs://<PROJECT_ID>-tfstate --versioning
    ```
-6. Artifact Registry:
-   ```
-   gcloud artifacts repositories create revenueflow --repository-format=docker --location=<REGION>
-   ```
+
+O Artifact Registry, as APIs e todo o resto são do Terraform (`apis.tf`,
+`artifact_registry.tf`). Só o bucket de state é bootstrap manual (chicken-and-egg).
 
 ## Fase 2 — Terraform: preparar e revisar
 
@@ -93,25 +92,17 @@ Primeiro deploy roda em **`LLM_STUB=1`** (sem Gemini real). Vertex real é a fea
 
 ## Fase 7 — Config do Cloud Run
 
-16. `template` do `google_cloud_run_v2_service`:
-    - `service_account` = a SA dedicada.
-    - `env`: `PUBSUB_PROJECT_ID=<PROJECT_ID>`, `TRACER_SINK=langfuse`, `CHANNEL_OUTBOUND=real`,
-      **`LLM_STUB=1`**, `GEMINI_MODEL`, `VERTEX_AI_LOCATION`.
-    - `DATABASE_URL` via socket do Cloud SQL: anexar a instância
-      (`annotations["run.googleapis.com/cloudsql-instances"]` ou volume) e usar
-      `postgresql://revenueflow:<pw>@/revenueflow?host=/cloudsql/<conn-name>`.
-    - Secrets via `env { value_source { secret_key_ref {...} } }` para os 4 secrets do WhatsApp
-      e as chaves do Langfuse.
-    - `scaling.min_instance_count`: ver decisão abaixo.
-17. Entrega Pub/Sub → worker — **decisão de arquitetura**: o `worker/subscriber.py` atual é um
-    *pull loop*. Em Cloud Run:
-    - **push (recomendado):** subscription push → endpoint interno `/internal/consume`
-      autenticado com OIDC da SA do Pub/Sub (`run.invoker`). Escala a zero. Requer um handler
-      novo (não existe ainda).
-    - **pull:** `min_instance_count = 1` e iniciar `run_subscriber()` no `lifespan`. Simples,
-      mas paga instância parada.
-18. Invoker: o webhook (`/webhook/whatsapp`) é público (`allUsers`) — a verificação de
-    assinatura HMAC já é o controle. O endpoint de consumo (se push) é privado.
+16. Já está no `cloud_run.tf`: `service_account` dedicada, `env` (`PUBSUB_PROJECT_ID`,
+    `TRACER_SINK`, `CHANNEL_OUTBOUND=real`, `LLM_STUB=1`, `GEMINI_MODEL`, `VERTEX_AI_LOCATION`,
+    `LANGFUSE_HOST`), `DATABASE_URL` via secret `revenueflow-database-url` (DSN com socket
+    `/cloudsql/<conn>`), `secret_key_ref` para os 4 secrets do WhatsApp (+ os 2 do Langfuse
+    quando `tracer_sink=langfuse`), volume do Cloud SQL, e `min_instance_count = var.min_instances`.
+17. **Entrega Pub/Sub → worker: decidido pelo ADR-047** — pull, com `min_instances >= 1`, e o
+    consumidor roda no mesmo serviço (`run_subscriber()` iniciado no `main.lifespan`). Isso é uma
+    mudança de **código do app** (companheira deste PR de infra); Terraform sozinho entrega um
+    serviço que publica e não consome.
+18. Invoker: `allUsers` `run.invoker` (`cloud_run.tf`) — a verificação de assinatura HMAC do
+    webhook é o controle (ADR-016/031).
 
 ## Fase 8 — Webhook do WhatsApp
 
@@ -123,7 +114,8 @@ Primeiro deploy roda em **`LLM_STUB=1`** (sem Gemini real). Vertex real é a fea
 20. **Langfuse** (ADR-045): deploy separado (Cloud Run + Cloud SQL próprio) ou SaaS. Setar
     `LANGFUSE_HOST` + keys como env/secret e `TRACER_SINK=langfuse`. Enquanto não existir,
     `TRACER_SINK=otel` ou `noop`.
-21. Budget alert (skill `finops`): `gcloud billing budgets create --billing-account=<BA> ...`.
+21. Budget alert: `budget.tf` cria um `google_billing_budget` (50/90/100%) quando
+    `var.billing_account` é setado; só alerta, não limita.
 
 ## Fase 10 — CI/CD
 
@@ -133,17 +125,18 @@ Primeiro deploy roda em **`LLM_STUB=1`** (sem Gemini real). Vertex real é a fea
 
 ---
 
-## Lacunas nos stubs `infra/terraform/` (preencher antes do `apply`)
+## O que ainda falta antes de um deploy funcional
 
-- `backend "gcs"` (state remoto)
-- `google_project_service` para as APIs
-- recurso `google_artifact_registry_repository`
-- conexão Cloud Run ↔ Cloud SQL (annotation / volume)
-- `env` + `secret_key_ref` no Cloud Run
-- secrets `whatsapp-verify-token` e `whatsapp-phone-number-id`
-- mecanismo de entrega Pub/Sub → worker (push endpoint + IAM, ou pull + min-instances)
-- `google_cloud_run_v2_service_iam_member` (público no webhook, privado no consumo)
-- hospedagem do Langfuse
+- **App:** `main.lifespan` precisa iniciar `worker.subscriber.run_subscriber()` (ADR-047).
+  Sem isso o serviço publica e não consome. PR de código separado.
+- **Terraform:** rodar `terraform init/fmt/validate/plan` numa máquina com credenciais
+  (não foi possível aqui — sem binário). Revisar o `plan` com `@terraform-reviewer`.
+- **Segredos:** popular as 6 versões (`gcloud secrets versions add`) — 4 WhatsApp sempre, 2
+  Langfuse se `tracer_sink=langfuse`.
+- **Langfuse:** decidir hospedagem (Cloud Run próprio vs SaaS) — enquanto isso `tracer_sink=noop`.
+- **CI/CD:** o pipeline do Cloud Build (Fase 10) ainda não existe.
+- **VPC/private IP** para Cloud SQL, `availability_type=REGIONAL`, uptime check + alerta —
+  trade-offs de V1 aceitos; ver `infra/terraform/README.md`.
 
 ## Rollback
 
