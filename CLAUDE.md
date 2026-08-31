@@ -16,13 +16,19 @@ Claude Code é um harness suportado deste repositório. O contrato de engenharia
 
 ## Estado da implementação
 
-A primeira fatia vertical — **WHATSAPP_INBOUND_SLICE** — foi entregue em 2026-08-31 (modo
-`LLM_STUB`; PRs #3–#10). O código de aplicação **existe** e não é mais scaffolding.
+Fatias entregues (modo `LLM_STUB`), arquivadas em `.claude/sdd/archive/`:
+
+- **WHATSAPP_INBOUND_SLICE** (2026-08-31, PRs #3–#10) — webhook → grafo → resposta ancorada.
+- **PRICING_AND_NEGOTIATION** (2026-08-31, PRs #12–#13) — Pricing Service determinístico +
+  Negotiation Agent + `interrupt()` que pausa o grafo e cria `Approval(PENDING)` quando o
+  desconto está fora da alçada (fire-and-stop; a retomada é a fatia `APPROVAL_RESUME`).
+
+O código de aplicação **existe** e não é mais scaffolding.
 
 Fluxo que roda: `POST /webhook/whatsapp` (HMAC) → Pub/Sub `message_received` → `process_event`
 idempotente → sessão + lead provisório → grafo LangGraph `classify_intent → supervisor →
-recommendation → respond` (checkpointer PostgreSQL) → resposta ancorada nos repositórios
-simulados → `ChannelOutbound.send`.
+recommendation → {respond | negotiation → [await_approval]}` (checkpointer PostgreSQL) →
+resposta ancorada / proposta de desconto / "encaminhado para aprovação" → `ChannelOutbound.send`.
 
 Mapa de `src/revenueflow/`:
 
@@ -33,10 +39,11 @@ Mapa de `src/revenueflow/`:
 | `observability` | `mask()` de PII; porta `Tracer` (`noop`/`langfuse`/`otel`); `cost_usd()` |
 | `events` | `EventEnvelope`; porta `EventPublisher` (`in_memory`/`pubsub`) |
 | `adapters` | portas de canal; `verify_signature` + `parse_inbound`; `WhatsAppOutbound` + `FakeOutbound` |
-| `repositories` | pool async psycopg; `processed_event`/`dispatch` (idempotência); `session`/`lead`; `sim_*` |
-| `services` | `ingest`, `session`, `identity`, `prompts`, `llm` (stub + Gemini lazy), `intent`, `respond` |
-| `tools` | 4 tools read-only + `registry` (fronteira de segurança — nenhuma tool de escrita) |
-| `agents` | `TurnState`; `recommendation_node`; `build_graph` (checkpointer Postgres) |
+| `repositories` | pool async psycopg; `processed_event`/`dispatch` (idempotência); `session`/`lead`; `sim_*`; `sim_pricing`; `approval` |
+| `policies` | `pricing_policy.evaluate()` — regra pura de alçada/margem, sem I/O nem LLM |
+| `services` | `ingest`, `session`, `identity`, `prompts`, `llm` (stub + Gemini lazy), `intent`, `respond`, `pricing`, `negotiation` |
+| `tools` | `RECOMMENDATION_TOOLS` (4 read-only) + `NEGOTIATION_TOOLS` (3 de pricing) + `registry` (fronteira — nenhuma tool de escrita, nenhum `set_discount`) |
+| `agents` | `TurnState`; `recommendation_node`; `negotiation_node` + `await_approval_node` (`interrupt`); `build_graph` (checkpointer Postgres) |
 | `api` | `webhook` (GET verify + POST 202), `health` (`/healthz`) |
 | `worker` | `process_event` (consumidor idempotente), `subscriber` (loop Pub/Sub real) |
 
