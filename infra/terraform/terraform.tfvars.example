@@ -1,6 +1,6 @@
-project_id    = "revenueflow-prod"
+project_id    = "revenueflow-ai-prod"
 region        = "southamerica-east1"
-image         = "southamerica-east1-docker.pkg.dev/revenueflow-prod/revenueflow/api:REPLACE_WITH_SHA"
+image         = "southamerica-east1-docker.pkg.dev/revenueflow-ai-prod/revenueflow/api:REPLACE_WITH_SHA"
 min_instances = 1
 max_instances = 4
 tracer_sink   = "noop"
