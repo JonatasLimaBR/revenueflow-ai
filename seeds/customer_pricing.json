@@ -1,0 +1,14 @@
+[
+  {
+    "customer_id": "CUST-001",
+    "product_id": "PMP-100-CEN",
+    "negotiated_price": 679.90,
+    "max_discount_pct": 0.08
+  },
+  {
+    "customer_id": "CUST-001",
+    "product_id": "PMP-050-PER",
+    "negotiated_price": 359.90,
+    "max_discount_pct": 0.08
+  }
+]

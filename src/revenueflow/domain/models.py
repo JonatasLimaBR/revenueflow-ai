@@ -1,5 +1,6 @@
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
+from decimal import Decimal
 from enum import StrEnum
 
 
@@ -61,3 +62,52 @@ class Lead:
     phone: str
     status: LeadStatus
     created_at: datetime
+
+
+class ApprovalStatus(StrEnum):
+    PENDING = "PENDING"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+    EXPIRED = "EXPIRED"
+
+
+@dataclass(slots=True)
+class PriceQuote:
+    product_id: str
+    list_price: Decimal
+    customer_price: Decimal
+    unit_cost: Decimal
+    maximum_discount: Decimal | None
+    minimum_margin: Decimal
+    valid_until: date
+
+
+@dataclass(slots=True)
+class MarginBreakdown:
+    revenue: Decimal
+    cost: Decimal
+    gross_profit: Decimal
+    margin: Decimal
+
+
+@dataclass(frozen=True, slots=True)
+class PolicyDecision:
+    allowed: bool
+    max_allowed: Decimal
+    resulting_margin: Decimal
+    requires_approval: bool
+    reason: str
+
+
+@dataclass(slots=True)
+class Approval:
+    approval_id: str
+    conversation_id: str
+    turn_id: str
+    reason: str
+    requested_discount: Decimal
+    current_margin: Decimal
+    resulting_margin: Decimal
+    amount: Decimal
+    customer_ref: str | None
+    status: ApprovalStatus
