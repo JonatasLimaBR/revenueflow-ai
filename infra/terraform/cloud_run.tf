@@ -52,6 +52,10 @@ resource "google_cloud_run_v2_service" "api" {
         value = "1"
       }
       env {
+        name  = "RUN_CONSUMER"
+        value = "1"
+      }
+      env {
         name  = "GEMINI_MODEL"
         value = var.gemini_model
       }
