@@ -16,25 +16,24 @@ Claude Code é um harness suportado deste repositório. O contrato de engenharia
 
 ## Estado da implementação
 
-Fatias entregues (modo `LLM_STUB`), arquivadas em `.claude/sdd/archive/`:
+Fatias entregues, arquivadas em `.claude/sdd/archive/`:
 
-- **WHATSAPP_INBOUND_SLICE** (2026-08-31, PRs #3–#10) — webhook → grafo → resposta ancorada.
-- **PRICING_AND_NEGOTIATION** (2026-08-31, PRs #12–#13) — Pricing Service determinístico +
-  Negotiation Agent + `interrupt()` que pausa o grafo e cria `Approval(PENDING)` quando o
-  desconto está fora da alçada (fire-and-stop; a retomada é a fatia `APPROVAL_RESUME`).
+- **WHATSAPP_INBOUND_SLICE** (2026-08-31, PRs #3–#10, modo `LLM_STUB`) — webhook → grafo →
+  resposta ancorada.
+- **PRICING_AND_NEGOTIATION** (2026-08-31, PRs #12–#13, modo `LLM_STUB`) — Pricing Service
+  determinístico + Negotiation Agent + `interrupt()` que pausa o grafo e cria `Approval(PENDING)`
+  quando o desconto está fora da alçada (fire-and-stop; a retomada é a fatia `APPROVAL_RESUME`).
+- **WHATSAPP_INBOUND_VERTEX** (2026-09-01, PRs #29–#30, ADR-049) — os 2 call sites de intent e
+  resposta ancorada passam a chamar o Vertex AI / Gemini real (`gemini-2.5-flash`, endpoint
+  `global`), keyless via ADC. Retry com backoff em erro transitório; na exaustão, `LLMError` →
+  nó terminal `handoff` (resposta fixa de encaminhamento, nada gerado). Prompts `v2` com moldura
+  anti-injection. Eval contra o modelo real em `tests/ai_eval/test_vertex_eval.py` (marker
+  `live`, fora do CI). **Produção roda `LLM_STUB=0`; dev local e CI mantêm o stub como default.**
 
-Em revisão:
-
-- **WHATSAPP_INBOUND_VERTEX** (2026-09-01, PR #29, ADR-049) — os 2 call sites de `LLM_STUB`
-  (intent e resposta ancorada) passam a chamar o Vertex AI / Gemini real, keyless via ADC.
-  Retry com backoff em erro transitório; na exaustão, `LLMError` → nó terminal `handoff`
-  (resposta fixa de encaminhamento, nada gerado). Prompts `v2` com moldura anti-injection.
-  Eval contra o modelo real fica em `tests/ai_eval/test_vertex_eval.py` (marker `live`, fora
-  do CI). Produção roda `LLM_STUB=0`; dev local e CI mantêm o stub como default.
-
-Deploy: o ambiente GCP está no ar (Cloud Run `revenueflow-api`, Cloud SQL, Pub/Sub) via
-`.github/workflows/terraform.yml` (ADR-048). Pendências operacionais: migrations do app, valores
-reais dos secrets do WhatsApp, registro do webhook no Meta.
+Deploy: o ambiente GCP está no ar (Cloud Run `revenueflow-api`, Cloud SQL, Pub/Sub, Cloud Run
+Job `revenueflow-api-migrate`) via `.github/workflows/terraform.yml` (ADR-048); schema + catálogo
+simulado aplicados. Pendências operacionais: valores reais dos secrets do WhatsApp e registro do
+webhook no Meta.
 
 O código de aplicação **existe** e não é mais scaffolding.
 
