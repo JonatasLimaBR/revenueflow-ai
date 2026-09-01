@@ -14,7 +14,10 @@ class Settings(BaseSettings):
     channel_outbound: ChannelOutbound = "fake"
     tracer_sink: TracerSink = "noop"
     llm_stub: bool = True
-    gemini_model: str = "gemini-2.0-flash"
+    gemini_model: str = "gemini-2.5-flash"
+    google_cloud_project: str = ""
+    vertex_location: str = "global"
+    llm_max_retries: int = 2
     run_consumer: bool = False
 
     database_url: str = "postgresql://revenueflow:revenueflow@localhost:5432/revenueflow"

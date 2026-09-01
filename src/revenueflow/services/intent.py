@@ -44,6 +44,7 @@ async def classify(text: str) -> tuple[Intent, float]:
 
     prompt = PROMPTS["intent"]
     model = get_settings().gemini_model
+    user = f"<mensagem_cliente>\n{text}\n</mensagem_cliente>"
     with get_tracer().generation("intent", model=model, prompt_version=prompt.version):
-        data = await llm.gemini_json(system=prompt.system, user=text, schema=_SCHEMA, model=model)
+        data = await llm.gemini_json(system=prompt.system, user=user, schema=_SCHEMA, model=model)
     return _coerce(data)

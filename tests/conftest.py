@@ -1,4 +1,5 @@
 import asyncio
+import os
 import subprocess
 import sys
 from collections.abc import AsyncIterator
@@ -20,6 +21,15 @@ _NO_DB_REASON = "no PostgreSQL reachable at DATABASE_URL (run `make db-up`)"
 
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
+
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    if os.getenv("RUN_LIVE_EVAL"):
+        return
+    skip_live = pytest.mark.skip(reason="live eval: set RUN_LIVE_EVAL=1 and configure ADC")
+    for item in items:
+        if "live" in item.keywords:
+            item.add_marker(skip_live)
 
 
 def _database_reachable() -> bool:

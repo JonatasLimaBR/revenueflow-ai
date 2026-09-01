@@ -11,3 +11,11 @@ resource "google_project_iam_member" "api_cloudsql_client" {
   role    = "roles/cloudsql.client"
   member  = "serviceAccount:${google_service_account.api.email}"
 }
+
+# Vertex AI / Gemini for the real LLM path (ADR-049). `user`, never `admin`
+# (ADR-008: least privilege).
+resource "google_project_iam_member" "api_vertex_user" {
+  project = var.project_id
+  role    = "roles/aiplatform.user"
+  member  = "serviceAccount:${google_service_account.api.email}"
+}

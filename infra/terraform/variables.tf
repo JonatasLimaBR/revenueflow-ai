@@ -51,8 +51,14 @@ variable "tracer_sink" {
 
 variable "gemini_model" {
   type        = string
-  description = "Vertex AI Gemini model id (unused while LLM_STUB=1)"
-  default     = "gemini-2.0-flash"
+  description = "Vertex AI Gemini model id (2.0 line is retired on Vertex; use 2.5)"
+  default     = "gemini-2.5-flash"
+}
+
+variable "vertex_location" {
+  type        = string
+  description = "Vertex AI location for Gemini; 'global' avoids regional availability gaps (ADR-049)"
+  default     = "global"
 }
 
 variable "langfuse_host" {
