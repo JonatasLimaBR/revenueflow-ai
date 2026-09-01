@@ -16,4 +16,5 @@ COPY scripts ./scripts
 
 EXPOSE 8000
 
-CMD ["uvicorn", "revenueflow.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Honor $PORT (Cloud Run injects it); fall back to 8000 for local runs.
+CMD ["sh", "-c", "exec uvicorn revenueflow.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

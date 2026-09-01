@@ -30,6 +30,11 @@ resource "google_cloud_run_v2_service" "api" {
     containers {
       image = var.image
 
+      # Cloud Run defaults to 8080 and probes that port; the app listens on 8000.
+      ports {
+        container_port = 8000
+      }
+
       volume_mounts {
         name       = "cloudsql"
         mount_path = "/cloudsql"
