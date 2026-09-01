@@ -8,7 +8,9 @@ WORKDIR /app
 
 COPY pyproject.toml ./
 COPY src ./src
-RUN pip install --upgrade pip && pip install -e .
+# [events] pulls google-cloud-pubsub, which the in-process pull consumer
+# (RUN_CONSUMER=1, ADR-047) imports at runtime. Without it run_subscriber() dies.
+RUN pip install --upgrade pip && pip install -e ".[events]"
 
 COPY migrations ./migrations
 COPY seeds ./seeds
