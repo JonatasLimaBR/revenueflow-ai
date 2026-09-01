@@ -1,10 +1,11 @@
 from typing import Any
 
 import pytest
-from google.genai import errors as genai_errors
 
 from revenueflow.domain.errors import LLMError
 from revenueflow.services import llm
+
+genai_errors = pytest.importorskip("google.genai.errors")
 
 
 @pytest.fixture(autouse=True)
