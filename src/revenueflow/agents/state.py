@@ -29,3 +29,5 @@ class TurnState(TurnInput, total=False):
     pending_approval_id: str | None
     final_outcome: str
     reply: str
+    handoff: bool
+    handoff_reason: str

@@ -5,8 +5,19 @@ Contexto: ADR-001 (GCP), ADR-002 (Cloud Run), ADR-004 (Cloud SQL), ADR-006 (Pub/
 ADR-027 (GCP System of Record), ADR-043 (`apply`/`destroy` nunca de agente),
 **ADR-048 (CD via GitHub Actions + WIF, sem chave)**.
 
-Primeiro deploy roda em **`LLM_STUB=1`** (sem Gemini real). Vertex real é a feature
-`WHATSAPP_INBOUND_VERTEX`.
+Desde a fatia `WHATSAPP_INBOUND_VERTEX` (ADR-049) o Cloud Run roda **`LLM_STUB=0`**: intent e
+resposta usam o Vertex AI real, keyless via ADC, com `VERTEX_AI_LOCATION=global` por default. A
+SA de runtime tem `roles/aiplatform.user`. Falha do Vertex → retry com backoff → handoff humano
+(nenhuma resposta gerada é enviada nesse turno).
+
+Antes de mergear qualquer mudança no caminho do modelo, rode o eval live contra o Vertex real:
+
+```
+gcloud auth application-default login
+RUN_LIVE_EVAL=1 GOOGLE_CLOUD_PROJECT=revenueflow-ai-prod LLM_STUB=0 pytest -m live -q
+```
+
+Sem `RUN_LIVE_EVAL` esses testes são pulados; o CI roda só o baseline stub + guardrails.
 
 Modelo (ADR-048): **um bootstrap manual, uma vez**; depois todo `terraform plan`/`apply` e o
 build da imagem rodam no GitHub Actions, autenticando por Workload Identity Federation —
@@ -89,7 +100,8 @@ nenhuma chave de service account em lugar nenhum.
 ## Fase 7 — Config do Cloud Run
 
 16. Já está no `cloud_run.tf`: `service_account` dedicada, `env` (`PUBSUB_PROJECT_ID`,
-    `TRACER_SINK`, `CHANNEL_OUTBOUND=real`, `LLM_STUB=1`, `GEMINI_MODEL`, `VERTEX_AI_LOCATION`,
+    `TRACER_SINK`, `CHANNEL_OUTBOUND=real`, `LLM_STUB=0`, `GEMINI_MODEL`, `GOOGLE_CLOUD_PROJECT`,
+    `VERTEX_AI_LOCATION` (`global`),
     `LANGFUSE_HOST`), `DATABASE_URL` via secret `revenueflow-database-url` (DSN com socket
     `/cloudsql/<conn>`), `secret_key_ref` para os 4 secrets do WhatsApp (+ os 2 do Langfuse
     quando `tracer_sink=langfuse`), volume do Cloud SQL, e `min_instance_count = var.min_instances`.

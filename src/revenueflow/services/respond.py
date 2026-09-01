@@ -38,7 +38,7 @@ async def generate(
     data_block = json.dumps(tool_results, ensure_ascii=False, separators=(",", ":"))
     user = (
         f"Intencao detectada: {intent.value}\n"
-        f"Mensagem do cliente: {customer_text}\n"
+        f"<mensagem_cliente>\n{customer_text}\n</mensagem_cliente>\n"
         f"<resultados>\n{data_block}\n</resultados>"
     )
     with get_tracer().generation("respond", model=model, prompt_version=prompt.version):

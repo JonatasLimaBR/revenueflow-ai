@@ -11,7 +11,7 @@ locals {
     "cloudbuild.googleapis.com",
     "compute.googleapis.com",
     "billingbudgets.googleapis.com",
-    # aiplatform.googleapis.com is added with the WHATSAPP_INBOUND_VERTEX slice.
+    "aiplatform.googleapis.com",
   ])
 }
 

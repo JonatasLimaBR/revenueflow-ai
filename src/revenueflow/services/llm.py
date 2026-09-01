@@ -10,16 +10,20 @@ failure.
 
 from __future__ import annotations
 
+import asyncio
 import json
+import random
 import re
 import unicodedata
-from collections.abc import Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from typing import Any
 
 from revenueflow.config import get_settings
 from revenueflow.domain.errors import LLMError
 from revenueflow.domain.models import Intent
 from revenueflow.observability import Usage, cost_usd, get_tracer
+
+_TRANSIENT_STATUS = frozenset({429, 500, 502, 503, 504})
 
 _GREETING = ("bom dia", "boa tarde", "boa noite", "oi", "ola")
 _PRICE = ("quanto custa", "quanto e", "preco", "valor")
@@ -135,18 +139,52 @@ async def gemini_text(*, system: str, user: str, model: str) -> str:
     return await _gemini_text_real(system=system, user=user, model=model)
 
 
+def _vertex_client() -> Any:
+    from google import genai
+
+    settings = get_settings()
+    return genai.Client(
+        vertexai=True,
+        project=settings.google_cloud_project or None,
+        location=settings.vertex_location,
+    )
+
+
+def _is_transient(exc: BaseException) -> bool:
+    from google.genai import errors as genai_errors
+
+    if isinstance(exc, genai_errors.ServerError):
+        return True
+    if isinstance(exc, genai_errors.ClientError):
+        return getattr(exc, "code", None) in _TRANSIENT_STATUS
+    return isinstance(exc, TimeoutError)
+
+
+async def _generate_with_retry(call: Callable[[Any], Awaitable[Any]]) -> Any:
+    """Run ``call`` against a fresh Vertex client, retrying only transient errors."""
+
+    retries = get_settings().llm_max_retries
+    client = _vertex_client()
+    last: BaseException | None = None
+    for attempt in range(retries + 1):
+        try:
+            return await call(client)
+        except Exception as exc:
+            if not _is_transient(exc):
+                raise LLMError("gemini call failed (non-retryable)") from exc
+            last = exc
+        if attempt < retries:
+            await asyncio.sleep(0.5 * (2**attempt) + random.uniform(0, 0.25))
+    raise LLMError("gemini call failed after retries") from last
+
+
 async def _gemini_json_real(
     *, system: str, user: str, schema: Mapping[str, Any], model: str
 ) -> dict[str, Any]:
-    from google import genai
-
     tracer = get_tracer()
-    try:
-        client = genai.Client()
-        with tracer.generation(
-            "llm.json", model=model, prompt_version="real", input=user
-        ) as generation:
-            response = await client.aio.models.generate_content(
+    with tracer.generation("llm.json", model=model, prompt_version="v2", input=user) as generation:
+        response = await _generate_with_retry(
+            lambda client: client.aio.models.generate_content(
                 model=model,
                 contents=user,
                 config={
@@ -155,32 +193,28 @@ async def _gemini_json_real(
                     "system_instruction": system,
                 },
             )
-            text = response.text or ""
+        )
+        text = response.text or ""
+        try:
             parsed = json.loads(text)
-            _record(generation, model=model, output=text, response=response)
-    except Exception as exc:
-        raise LLMError("gemini json call failed") from exc
+        except json.JSONDecodeError as exc:
+            raise LLMError("gemini json call returned invalid JSON") from exc
+        _record(generation, model=model, output=text, response=response)
     if not isinstance(parsed, dict):
         raise LLMError("gemini json call returned a non-object")
     return {str(key): value for key, value in parsed.items()}
 
 
 async def _gemini_text_real(*, system: str, user: str, model: str) -> str:
-    from google import genai
-
     tracer = get_tracer()
-    try:
-        client = genai.Client()
-        with tracer.generation(
-            "llm.text", model=model, prompt_version="real", input=user
-        ) as generation:
-            response = await client.aio.models.generate_content(
+    with tracer.generation("llm.text", model=model, prompt_version="v2", input=user) as generation:
+        response = await _generate_with_retry(
+            lambda client: client.aio.models.generate_content(
                 model=model,
                 contents=user,
                 config={"system_instruction": system},
             )
-            text = response.text or ""
-            _record(generation, model=model, output=text, response=response)
-    except Exception as exc:
-        raise LLMError("gemini text call failed") from exc
+        )
+        text = response.text or ""
+        _record(generation, model=model, output=text, response=response)
     return str(text)

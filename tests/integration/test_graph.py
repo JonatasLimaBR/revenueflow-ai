@@ -1,10 +1,12 @@
 import re
 from typing import Any
 
+import pytest
 from langgraph.checkpoint.memory import MemorySaver
 from psycopg import AsyncConnection
 
 from revenueflow.agents.graph import build_graph
+from revenueflow.domain.errors import LLMError
 from revenueflow.domain.models import Intent
 
 _PRICE = re.compile(r"\d+[.,]\d{2}")
@@ -48,6 +50,46 @@ async def test_greeting_turn_skips_recommendation(db: None) -> None:
     reply = result["reply"]
     assert isinstance(reply, str)
     assert reply
+
+
+async def test_llmerror_in_classify_routes_to_handoff(
+    db: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def boom(_text: str) -> tuple[Intent, float]:
+        raise LLMError("vertex unavailable")
+
+    monkeypatch.setattr("revenueflow.agents.graph.classify", boom)
+    compiled = build_graph(MemorySaver())
+
+    result = await compiled.ainvoke(
+        {"conversation_id": "c-hoff1", "customer_text": "quero uma bomba d'agua 1cv"},
+        config={"configurable": {"thread_id": "c-hoff1"}},
+    )
+
+    assert result["handoff"] is True
+    assert result["handoff_reason"] == "intent"
+    assert result["final_outcome"] == "handoff"
+    assert "atendente humano" in result["reply"]
+
+
+async def test_llmerror_in_respond_routes_to_handoff(
+    db: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def boom(**_kwargs: Any) -> str:
+        raise LLMError("vertex unavailable")
+
+    monkeypatch.setattr("revenueflow.agents.graph.generate", boom)
+    compiled = build_graph(MemorySaver())
+
+    result = await compiled.ainvoke(
+        {"conversation_id": "c-hoff2", "customer_text": "oi, tudo bem?"},
+        config={"configurable": {"thread_id": "c-hoff2"}},
+    )
+
+    assert result["handoff"] is True
+    assert result["handoff_reason"] == "respond"
+    assert result["final_outcome"] == "handoff"
+    assert "atendente humano" in result["reply"]
 
 
 async def test_migrate_created_checkpoint_table(conn: AsyncConnection[Any]) -> None:

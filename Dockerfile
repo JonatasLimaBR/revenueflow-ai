@@ -8,9 +8,10 @@ WORKDIR /app
 
 COPY pyproject.toml ./
 COPY src ./src
-# [events] pulls google-cloud-pubsub, which the in-process pull consumer
-# (RUN_CONSUMER=1, ADR-047) imports at runtime. Without it run_subscriber() dies.
-RUN pip install --upgrade pip && pip install -e ".[events]"
+# [events] pulls google-cloud-pubsub for the in-process pull consumer
+# (RUN_CONSUMER=1, ADR-047); [llm] pulls google-genai for the real Vertex path
+# (LLM_STUB=0, ADR-049). Without them run_subscriber() / the model calls die.
+RUN pip install --upgrade pip && pip install -e ".[events,llm]"
 
 COPY migrations ./migrations
 COPY seeds ./seeds

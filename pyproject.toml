@@ -71,3 +71,4 @@ ignore_missing_imports = true
 testpaths = ["tests"]
 addopts = "-ra"
 asyncio_mode = "auto"
+markers = ["live: real Vertex AI call; needs RUN_LIVE_EVAL=1 and ADC"]

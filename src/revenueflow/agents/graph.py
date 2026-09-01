@@ -15,6 +15,7 @@ from langgraph.graph import END, START, StateGraph
 from revenueflow.agents.negotiation import await_approval_node, negotiation_node
 from revenueflow.agents.recommendation import recommendation_node
 from revenueflow.agents.state import TurnState
+from revenueflow.domain.errors import LLMError
 from revenueflow.domain.models import Intent
 from revenueflow.observability import get_tracer
 from revenueflow.services import classify, generate
@@ -25,12 +26,29 @@ NEGOTIATION_INTENTS: frozenset[str] = frozenset(
     {Intent.NEGOTIATION.value, Intent.PRICE_REQUEST.value, Intent.QUOTE_REQUEST.value}
 )
 
+_HANDOFF_REPLY = (
+    "Ainda nao localizei essa informacao por aqui; "
+    "um atendente humano vai dar sequencia ao seu atendimento."
+)
+
+
+def _to_handoff(reason: str) -> dict[str, Any]:
+    return {
+        "handoff": True,
+        "handoff_reason": reason,
+        "reply": _HANDOFF_REPLY,
+        "final_outcome": "handoff",
+    }
+
 
 async def classify_intent_node(state: TurnState) -> dict[str, Any]:
     """Classify the customer text into a controlled intent plus confidence."""
 
     with get_tracer().span("node.classify_intent"):
-        intent, confidence = await classify(state["customer_text"])
+        try:
+            intent, confidence = await classify(state["customer_text"])
+        except LLMError:
+            return _to_handoff("intent")
     return {"intent": intent.value, "confidence": confidence}
 
 
@@ -39,6 +57,12 @@ async def supervisor_node(state: TurnState) -> dict[str, Any]:
 
     get_tracer().event("supervisor.route", attrs={"intent": state["intent"]})
     return {}
+
+
+def route_after_classify(state: TurnState) -> str:
+    """Skip straight to the handoff node when intent classification failed."""
+
+    return "handoff" if state.get("handoff") else "supervisor"
 
 
 def route_from_supervisor(state: TurnState) -> str:
@@ -65,12 +89,28 @@ async def respond_node(state: TurnState) -> dict[str, Any]:
     """Draft the customer reply, grounded only in ``tool_results``."""
 
     with get_tracer().span("node.respond"):
-        reply = await generate(
-            intent=Intent(state["intent"]),
-            customer_text=state["customer_text"],
-            tool_results=state.get("tool_results", []),
-        )
+        try:
+            reply = await generate(
+                intent=Intent(state["intent"]),
+                customer_text=state["customer_text"],
+                tool_results=state.get("tool_results", []),
+            )
+        except LLMError:
+            return _to_handoff("respond")
     return {"reply": reply}
+
+
+async def handoff_node(state: TurnState) -> dict[str, Any]:
+    """Terminal node for a model failure: the reply is already the fixed sentence."""
+
+    get_tracer().end(outcome="handoff", handoff=True)
+    return {}
+
+
+def route_after_respond(state: TurnState) -> str:
+    """Route a failed response draft to the handoff node, otherwise end."""
+
+    return "handoff" if state.get("handoff") else END
 
 
 def build_graph(checkpointer: Any) -> Any:
@@ -83,8 +123,13 @@ def build_graph(checkpointer: Any) -> Any:
     graph.add_node("negotiation", negotiation_node)
     graph.add_node("await_approval", await_approval_node)
     graph.add_node("respond", respond_node)
+    graph.add_node("handoff", handoff_node)
     graph.add_edge(START, "classify_intent")
-    graph.add_edge("classify_intent", "supervisor")
+    graph.add_conditional_edges(
+        "classify_intent",
+        route_after_classify,
+        {"supervisor": "supervisor", "handoff": "handoff"},
+    )
     graph.add_conditional_edges(
         "supervisor",
         route_from_supervisor,
@@ -101,7 +146,12 @@ def build_graph(checkpointer: Any) -> Any:
         {"await_approval": "await_approval", END: END},
     )
     graph.add_edge("await_approval", END)
-    graph.add_edge("respond", END)
+    graph.add_conditional_edges(
+        "respond",
+        route_after_respond,
+        {"handoff": "handoff", END: END},
+    )
+    graph.add_edge("handoff", END)
     return graph.compile(checkpointer=checkpointer)
 
 

@@ -59,7 +59,7 @@ resource "google_cloud_run_v2_service" "api" {
       }
       env {
         name  = "LLM_STUB"
-        value = "1"
+        value = "0"
       }
       env {
         name  = "RUN_CONSUMER"
@@ -70,8 +70,12 @@ resource "google_cloud_run_v2_service" "api" {
         value = var.gemini_model
       }
       env {
+        name  = "GOOGLE_CLOUD_PROJECT"
+        value = var.project_id
+      }
+      env {
         name  = "VERTEX_AI_LOCATION"
-        value = var.region
+        value = var.vertex_location
       }
       env {
         name  = "LANGFUSE_HOST"

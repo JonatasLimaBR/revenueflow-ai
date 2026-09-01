@@ -1,8 +1,9 @@
 """LLM_STUB baseline eval for intent classification.
 
 This is a synthetic golden set scored against the deterministic keyword stub,
-not a real-model evaluation. It exists to lock in the stub's behaviour and will
-be replaced by a Vertex-backed golden-set eval when that increment lands.
+not a real-model evaluation. It stays in the CI suite to prove the stub path
+(dev local + CI) has not regressed. The Vertex-backed golden set lives in
+``tests/ai_eval/test_vertex_eval.py`` (marked ``live``, ADR-049).
 """
 
 from revenueflow.domain.models import Intent

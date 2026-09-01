@@ -283,3 +283,4 @@ Claude deve localizar e ler os documentos relacionados antes de implementar.
 - [ADR-046 — Docker Compose e Makefile como harness de desenvolvimento](docs/adrs/adr-046-docker-compose-and-makefile-dev-harness.md)
 - [ADR-047 — Cloud Run consome o Pub/Sub por pull, com min_instances >= 1 na V1](docs/adrs/adr-047-cloud-run-consumes-pub-sub-by-pull-with-min-instance.md)
 - [ADR-048 — CD via GitHub Actions + Workload Identity Federation, sem chave](docs/adrs/adr-048-github-actions-wif-keyless-cd.md)
+- [ADR-049 — Vertex AI via google-genai (vertexai=True), com retry e handoff](docs/adrs/adr-049-vertex-ai-via-google-genai.md)
