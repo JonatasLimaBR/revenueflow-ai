@@ -23,27 +23,41 @@ Fatias entregues (modo `LLM_STUB`), arquivadas em `.claude/sdd/archive/`:
   Negotiation Agent + `interrupt()` que pausa o grafo e cria `Approval(PENDING)` quando o
   desconto está fora da alçada (fire-and-stop; a retomada é a fatia `APPROVAL_RESUME`).
 
+Em revisão:
+
+- **WHATSAPP_INBOUND_VERTEX** (2026-09-01, PR #29, ADR-049) — os 2 call sites de `LLM_STUB`
+  (intent e resposta ancorada) passam a chamar o Vertex AI / Gemini real, keyless via ADC.
+  Retry com backoff em erro transitório; na exaustão, `LLMError` → nó terminal `handoff`
+  (resposta fixa de encaminhamento, nada gerado). Prompts `v2` com moldura anti-injection.
+  Eval contra o modelo real fica em `tests/ai_eval/test_vertex_eval.py` (marker `live`, fora
+  do CI). Produção roda `LLM_STUB=0`; dev local e CI mantêm o stub como default.
+
+Deploy: o ambiente GCP está no ar (Cloud Run `revenueflow-api`, Cloud SQL, Pub/Sub) via
+`.github/workflows/terraform.yml` (ADR-048). Pendências operacionais: migrations do app, valores
+reais dos secrets do WhatsApp, registro do webhook no Meta.
+
 O código de aplicação **existe** e não é mais scaffolding.
 
 Fluxo que roda: `POST /webhook/whatsapp` (HMAC) → Pub/Sub `message_received` → `process_event`
 idempotente → sessão + lead provisório → grafo LangGraph `classify_intent → supervisor →
 recommendation → {respond | negotiation → [await_approval]}` (checkpointer PostgreSQL) →
-resposta ancorada / proposta de desconto / "encaminhado para aprovação" → `ChannelOutbound.send`.
+resposta ancorada / proposta de desconto / "encaminhado para aprovação" / handoff em falha de
+LLM → `ChannelOutbound.send`.
 
 Mapa de `src/revenueflow/`:
 
 | Pacote | Papel |
 |---|---|
-| `config` | `Settings` tipado (pydantic-settings) + flags `CHANNEL_OUTBOUND`/`TRACER_SINK`/`LLM_STUB` |
+| `config` | `Settings` tipado (pydantic-settings) + flags `CHANNEL_OUTBOUND`/`TRACER_SINK`/`LLM_STUB`; `google_cloud_project`/`vertex_location`/`llm_max_retries` |
 | `domain` | erros tipados; enums `SessionStatus`/`LeadStatus`/`Intent`; dataclasses de entidade |
 | `observability` | `mask()` de PII; porta `Tracer` (`noop`/`langfuse`/`otel`); `cost_usd()` |
 | `events` | `EventEnvelope`; porta `EventPublisher` (`in_memory`/`pubsub`) |
 | `adapters` | portas de canal; `verify_signature` + `parse_inbound`; `WhatsAppOutbound` + `FakeOutbound` |
 | `repositories` | pool async psycopg; `processed_event`/`dispatch` (idempotência); `session`/`lead`; `sim_*`; `sim_pricing`; `approval` |
 | `policies` | `pricing_policy.evaluate()` — regra pura de alçada/margem, sem I/O nem LLM |
-| `services` | `ingest`, `session`, `identity`, `prompts`, `llm` (stub + Gemini lazy), `intent`, `respond`, `pricing`, `negotiation` |
+| `services` | `ingest`, `session`, `identity`, `prompts` (v2, anti-injection), `llm` (stub + Vertex real: `_generate_with_retry`, lazy `google-genai`), `intent`, `respond`, `pricing`, `negotiation` |
 | `tools` | `RECOMMENDATION_TOOLS` (4 read-only) + `NEGOTIATION_TOOLS` (3 de pricing) + `registry` (fronteira — nenhuma tool de escrita, nenhum `set_discount`) |
-| `agents` | `TurnState`; `recommendation_node`; `negotiation_node` + `await_approval_node` (`interrupt`); `build_graph` (checkpointer Postgres) |
+| `agents` | `TurnState`; `recommendation_node`; `negotiation_node` + `await_approval_node` (`interrupt`); `handoff_node` (falha de LLM); `build_graph` (checkpointer Postgres) |
 | `api` | `webhook` (GET verify + POST 202), `health` (`/healthz`) |
 | `worker` | `process_event` (consumidor idempotente), `subscriber` (loop Pub/Sub real) |
 
@@ -51,9 +65,9 @@ Portas com impl `noop`/`in_memory`/`fake` por default: a suíte roda só com `po
 caminhos reais (`google-genai`, `google-cloud-pubsub`, `httpx` para a Graph API, `langfuse`) são
 imports lazy atrás de flags/extras opcionais.
 
-Modo `LLM_STUB` (`llm_stub=True` por default): intent e resposta usam um stub determinístico; o
-`google-genai` está escrito mas desligado. O upgrade para Vertex real é a feature seguinte
-`WHATSAPP_INBOUND_VERTEX`.
+Modo `LLM_STUB`: `llm_stub=True` continua sendo o default de `Settings` (dev local com `make up`
+sem GCP, e CI — que roda sem credencial de nuvem). Em produção o Cloud Run roda `LLM_STUB=0` e
+intent/resposta chamam o Vertex AI real (ADR-049, fatia `WHATSAPP_INBOUND_VERTEX`).
 
 ### Como rodar
 
@@ -65,8 +79,8 @@ make seed        # popula o catálogo/estoque simulado
 make check       # lint + typecheck + testes + validate_docs (tudo que o CI roda)
 ```
 
-`make test` sobe `postgres` via compose e roda `pytest -q` (94 testes: unit + integration +
-security + ai_eval).
+`make test` sobe `postgres` via compose e roda `pytest -q` (~150 testes: unit + integration +
+security + ai_eval; os testes marcados `live` só rodam com `RUN_LIVE_EVAL=1` + ADC).
 
 ## Invariantes
 
