@@ -26,8 +26,10 @@ nenhuma chave de service account em lugar nenhum.
 
 ## Fase 1 — Bootstrap keyless (uma vez, ADR-048)
 
-4. Roda com a sua identidade de admin. Cria o bucket de state, o Workload Identity pool/provider
-   e a service account `revenueflow-deployer`:
+4. Roda com a sua identidade de admin. Cria o bucket de state, o Workload Identity pool/provider,
+   a service account `revenueflow-deployer` e o repositório Artifact Registry `revenueflow`
+   (o job `deploy` dá `docker push` **antes** do `terraform apply` da config principal, então o
+   repo precisa existir antes):
    ```
    cd infra/terraform/bootstrap
    terraform init
@@ -63,7 +65,8 @@ nenhuma chave de service account em lugar nenhum.
 
 13. É o job `deploy` do workflow: `docker build` + `docker push` para
     `<REGION>-docker.pkg.dev/<PROJECT_ID>/revenueflow/api:<sha do commit>`, autenticando por
-    WIF. A imagem no Cloud Run é sempre `:<sha>`, nunca `:latest`. Nada manual.
+    WIF. A imagem no Cloud Run é sempre `:<sha>`, nunca `:latest`. Nada manual. O repositório
+    `revenueflow` já existe desde a Fase 1 (bootstrap) — o `push` acontece antes do `apply`.
 
 ## Fase 5 — `terraform apply` (via Environment `production`)
 
@@ -121,8 +124,10 @@ nenhuma chave de service account em lugar nenhum.
 
 ## O que ainda falta antes de um deploy funcional
 
-- **Bootstrap (Fase 1):** rodar `infra/terraform/bootstrap` uma vez e setar as 5 Variables +
-  o Environment `production` no repo.
+- **Bootstrap (Fase 1):** rodar `infra/terraform/bootstrap` uma vez (cria state bucket, WIF,
+  SA `revenueflow-deployer` e o repo Artifact Registry `revenueflow`) e setar as 5 Variables +
+  o Environment `production` no repo. Se já rodou o bootstrap antes deste repo ser adicionado
+  lá, rode `terraform apply` de novo — é aditivo.
 - **Terraform:** o primeiro `plan` no workflow (num projeto real) + revisão `@terraform-reviewer`.
 - **Segredos:** popular as 6 versões (`gcloud secrets versions add`) — 4 WhatsApp sempre, 2
   Langfuse se `tracer_sink=langfuse`.

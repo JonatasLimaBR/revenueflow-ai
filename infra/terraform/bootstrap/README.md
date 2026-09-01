@@ -3,10 +3,16 @@
 Run **once**, from a human terminal with project-admin rights (Project IAM Admin +
 Storage Admin on the project). Creates what the CI pipeline needs to run keyless
 (ADR-048): the Terraform state bucket, the GitHub Workload Identity pool/provider,
-and the `revenueflow-deployer` service account with its roles.
+the `revenueflow-deployer` service account with its roles, and the `revenueflow`
+Artifact Registry repo.
 
 State for this module is **local** and git-ignored (chicken-and-egg: it creates
-the bucket the main config uses).
+the bucket the main config uses). The Artifact Registry repo is here for the same
+reason — the `deploy` job pushes the image *before* it runs `terraform apply` on
+the main config, so the repo has to exist ahead of it.
+
+Re-running is safe and additive: if you bootstrapped before this repo was added
+here, run `terraform apply` again to create it.
 
 ## Run
 

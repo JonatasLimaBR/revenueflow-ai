@@ -8,6 +8,7 @@ locals {
     "iamcredentials.googleapis.com",
     "sts.googleapis.com",
     "storage.googleapis.com",
+    "artifactregistry.googleapis.com",
   ])
 
   deployer_roles = toset([
@@ -29,6 +30,18 @@ resource "google_project_service" "bootstrap" {
 
   service            = each.value
   disable_on_destroy = false
+}
+
+# The CD pipeline (.github/workflows/terraform.yml) pushes the image BEFORE it runs
+# `terraform apply`, so the registry has to exist ahead of the main config — same
+# chicken-and-egg as the state bucket. It lives here, not in ../artifact_registry.tf.
+resource "google_artifact_registry_repository" "api" {
+  repository_id = "revenueflow"
+  location      = var.region
+  format        = "DOCKER"
+  description   = "RevenueFlow container images"
+
+  depends_on = [google_project_service.bootstrap]
 }
 
 resource "google_storage_bucket" "tfstate" {

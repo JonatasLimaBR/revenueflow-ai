@@ -10,7 +10,6 @@ Provisions the RevenueFlow environment on GCP. Full procedure: `docs/engineering
 | `backend.tf` | GCS remote state (partial config — pass `-backend-config` at init) |
 | `variables.tf` / `terraform.tfvars.example` | inputs |
 | `apis.tf` | `google_project_service` for every API used |
-| `artifact_registry.tf` | Docker repo for the image |
 | `iam.tf` | runtime service account + project-scoped roles |
 | `pubsub.tf` | topic + DLQ + pull subscription `revenueflow.messages`, resource-scoped IAM |
 | `cloud_sql.tf` | Postgres 16 instance + db + `random_password` + user |
@@ -18,6 +17,9 @@ Provisions the RevenueFlow environment on GCP. Full procedure: `docs/engineering
 | `cloud_run.tf` | the v2 service (env + secret refs + Cloud SQL volume) + public invoker |
 | `budget.tf` | optional monthly budget alert |
 | `outputs.tf` | service URL, connection name, topic/subscription ids, SA email |
+
+The `revenueflow` Artifact Registry repo is **not** here — `bootstrap/` creates it, because
+the CD pipeline pushes the image before this config's `apply` runs.
 
 ## Init / plan (human)
 

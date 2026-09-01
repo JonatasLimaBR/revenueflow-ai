@@ -20,7 +20,9 @@ output "runtime_service_account" {
   value = google_service_account.api.email
 }
 
+# The "revenueflow" repo is created by infra/terraform/bootstrap (it has to exist
+# before the CD pipeline pushes the image, ahead of this config's apply).
 output "artifact_registry_repo" {
   description = "docker push target prefix"
-  value       = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.api.repository_id}"
+  value       = "${var.region}-docker.pkg.dev/${var.project_id}/revenueflow"
 }
