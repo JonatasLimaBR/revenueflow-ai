@@ -9,6 +9,11 @@ on:
     branches: [main]
     paths:
       - "infra/terraform/**"
+      - ".github/workflows/terraform.yml"
+      # The deploy job builds and pushes the image, so image inputs must redeploy.
+      - "Dockerfile"
+      - "pyproject.toml"
+      - "src/**"
   workflow_dispatch:
 
 permissions:
@@ -24,7 +29,7 @@ env:
 jobs:
   plan:
     # Skipped until the bootstrap outputs are set as repo Variables (ADR-048).
-    if: github.event_name != 'push' && vars.WIF_PROVIDER != ''
+    if: github.event_name == 'pull_request' && vars.WIF_PROVIDER != ''
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -77,7 +82,9 @@ jobs:
             });
 
   deploy:
-    if: github.event_name == 'push' && vars.WIF_PROVIDER != ''
+    if: >-
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+      && vars.WIF_PROVIDER != ''
     runs-on: ubuntu-latest
     environment: production
     steps:
