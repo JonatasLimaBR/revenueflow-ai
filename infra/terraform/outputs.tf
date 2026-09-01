@@ -20,6 +20,11 @@ output "runtime_service_account" {
   value = google_service_account.api.email
 }
 
+output "migrate_job" {
+  description = "gcloud run jobs execute <this> --region <region> --wait"
+  value       = google_cloud_run_v2_job.migrate.name
+}
+
 # The "revenueflow" repo is created by infra/terraform/bootstrap (it has to exist
 # before the CD pipeline pushes the image, ahead of this config's apply).
 output "artifact_registry_repo" {

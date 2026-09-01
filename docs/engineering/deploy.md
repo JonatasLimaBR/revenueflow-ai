@@ -94,12 +94,15 @@ nenhuma chave de service account em lugar nenhum.
 
 ## Fase 6 — Migrar o banco
 
-15. Cloud SQL Auth Proxy local (ou um Cloud Run Job com a mesma imagem):
+15. **Cloud Run Job `revenueflow-api-migrate`** (`infra/terraform/migrate_job.tf`, mesma imagem)
+    — roda `scripts/migrate.py && scripts/seed.py` in-cluster, com a SA de runtime e o socket
+    do Cloud SQL, sem Auth Proxy local. O `terraform apply` cria/atualiza o job; você o executa:
     ```
-    ./cloud-sql-proxy <PROJECT_ID>:<REGION>:revenueflow-api-oltp &
-    DATABASE_URL="postgresql://revenueflow:<PW>@127.0.0.1:5432/revenueflow" python scripts/migrate.py
-    DATABASE_URL=... python scripts/seed.py
+    gcloud run jobs execute revenueflow-api-migrate --region <REGION> --project <PROJECT_ID> --wait
     ```
+    Rode depois de todo deploy que tenha migration nova. Alternativa manual: Cloud SQL Auth
+    Proxy local + `DATABASE_URL=postgresql://revenueflow:<PW>@127.0.0.1:5432/revenueflow`
+    (`<PW>` = secret `revenueflow-db-password`).
 
 ## Fase 7 — Config do Cloud Run
 

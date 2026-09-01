@@ -15,6 +15,7 @@ Provisions the RevenueFlow environment on GCP. Full procedure: `docs/engineering
 | `cloud_sql.tf` | Postgres 16 instance + db + `random_password` + user |
 | `secrets.tf` | 6 app secrets (values added manually) + `db-password` + `database-url` (Terraform-versioned) |
 | `cloud_run.tf` | the v2 service (env + secret refs + Cloud SQL volume) + public invoker |
+| `migrate_job.tf` | Cloud Run Job that runs `migrate.py` + `seed.py` on the same image |
 | `budget.tf` | optional monthly budget alert |
 | `outputs.tf` | service URL, connection name, topic/subscription ids, SA email |
 
