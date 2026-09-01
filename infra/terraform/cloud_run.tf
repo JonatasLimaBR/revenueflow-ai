@@ -12,6 +12,11 @@ resource "google_cloud_run_v2_service" "api" {
   location = var.region
   ingress  = "INGRESS_TRAFFIC_ALL"
 
+  # The provider defaults this to true. A failed create taints the resource, so the
+  # next apply plans a replace, and the delete half is then blocked - wedging the
+  # pipeline. This is a stateless service; the OLTP protection lives on Cloud SQL.
+  deletion_protection = false
+
   template {
     service_account = google_service_account.api.email
 
