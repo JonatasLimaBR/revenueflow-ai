@@ -51,8 +51,8 @@ variable "tracer_sink" {
 
 variable "gemini_model" {
   type        = string
-  description = "Vertex AI Gemini model id"
-  default     = "gemini-2.0-flash"
+  description = "Vertex AI Gemini model id (2.0 line is retired on Vertex; use 2.5)"
+  default     = "gemini-2.5-flash"
 }
 
 variable "vertex_location" {

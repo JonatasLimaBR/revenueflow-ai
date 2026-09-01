@@ -14,8 +14,12 @@ Antes de mergear qualquer mudança no caminho do modelo, rode o eval live contra
 
 ```
 gcloud auth application-default login
+gcloud auth application-default set-quota-project revenueflow-ai-prod
 RUN_LIVE_EVAL=1 GOOGLE_CLOUD_PROJECT=revenueflow-ai-prod LLM_STUB=0 pytest -m live -q
 ```
+
+O modelo default é `gemini-2.5-flash` no endpoint `VERTEX_AI_LOCATION=global` (a linha
+`gemini-2.0-flash` foi retirada do Vertex).
 
 Sem `RUN_LIVE_EVAL` esses testes são pulados; o CI roda só o baseline stub + guardrails.
 

@@ -76,8 +76,10 @@ credencial sem abrir mão de um eval contra o modelo real.
 - A cobertura contra o modelo real depende de um passo manual (`RUN_LIVE_EVAL=1 pytest -m live`
   com ADC), documentado no runbook e registrado no BUILD_REPORT.
 - `services/llm.py` passa a acoplar (lazy, só no caminho real) `google.genai.errors`.
-- Custo por turno = 2 chamadas Gemini (`gemini-2.0-flash`). Sem hard cap nesta fatia — ADR-023
-  trata custo como KPI/observabilidade; `cost_usd` continua registrado por generation.
+- Custo por turno = 2 chamadas Gemini (`gemini-2.5-flash` — a linha 2.0 foi retirada do Vertex
+  para o projeto; a validação de disponibilidade fixou `gemini-2.5-flash` no endpoint `global`).
+  Sem hard cap nesta fatia — ADR-023 trata custo como KPI/observabilidade; `cost_usd` continua
+  registrado por generation.
 - O grafo ganha um nó `handoff` e dois campos opcionais no `TurnState` (`handoff`,
   `handoff_reason`).
 - `LLM_STUB` continua sendo o default de `Settings` — dev local (`make up` sem GCP) e CI não
