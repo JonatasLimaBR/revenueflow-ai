@@ -13,19 +13,27 @@ from typing import Any
 from langgraph.graph import END, START, StateGraph
 
 from revenueflow.agents.apply_decision import apply_decision_node
+from revenueflow.agents.checkout import checkout_node
 from revenueflow.agents.negotiation import await_approval_node, negotiation_node
 from revenueflow.agents.recommendation import recommendation_node
 from revenueflow.agents.state import TurnState
 from revenueflow.domain.errors import LLMError
 from revenueflow.domain.models import Intent
 from revenueflow.observability import get_tracer
+from revenueflow.repositories import checkout as checkout_repo
+from revenueflow.repositories.db import unit_of_work
 from revenueflow.services import classify, generate
-from revenueflow.tools.registry import NEGOTIATION_TOOL_NAMES, RECOMMENDATION_TOOL_NAMES
+from revenueflow.tools.registry import (
+    CHECKOUT_TOOL_NAMES,
+    NEGOTIATION_TOOL_NAMES,
+    RECOMMENDATION_TOOL_NAMES,
+)
 
 RECO_INTENTS: frozenset[str] = frozenset({Intent.PRODUCT_SEARCH.value, Intent.RECOMMENDATION.value})
 NEGOTIATION_INTENTS: frozenset[str] = frozenset(
     {Intent.NEGOTIATION.value, Intent.PRICE_REQUEST.value, Intent.QUOTE_REQUEST.value}
 )
+CHECKOUT_INTENTS: frozenset[str] = frozenset({Intent.ORDER_REQUEST.value})
 
 _HANDOFF_REPLY = (
     "Ainda nao localizei essa informacao por aqui; "
@@ -54,10 +62,12 @@ async def classify_intent_node(state: TurnState) -> dict[str, Any]:
 
 
 async def supervisor_node(state: TurnState) -> dict[str, Any]:
-    """Pass-through supervisor; only records the routing decision for now."""
+    """Record the routing decision and surface any open quote for the conversation."""
 
+    async with unit_of_work() as conn:
+        open_quote = await checkout_repo.get_open_quote(conn, state["conversation_id"])
     get_tracer().event("supervisor.route", attrs={"intent": state["intent"]})
-    return {}
+    return {"open_quote_id": open_quote.quote_id if open_quote is not None else None}
 
 
 def route_after_classify(state: TurnState) -> str:
@@ -67,23 +77,46 @@ def route_after_classify(state: TurnState) -> str:
 
 
 def route_from_supervisor(state: TurnState) -> str:
-    """Send reco- and negotiation-shaped intents through the agent path, else reply."""
+    """Open quote -> confirmation gate; reco/negotiation/order intents -> agent path."""
 
-    if state["intent"] in RECO_INTENTS or state["intent"] in NEGOTIATION_INTENTS:
+    if state.get("open_quote_id"):
+        return "checkout"
+    if (
+        state["intent"] in RECO_INTENTS
+        or state["intent"] in NEGOTIATION_INTENTS
+        or state["intent"] in CHECKOUT_INTENTS
+    ):
         return "recommendation"
     return "respond"
 
 
 def route_after_recommendation(state: TurnState) -> str:
-    """Continue into the Negotiation Agent for discount-shaped intents, else reply."""
+    """Continue into the Negotiation Agent for discount- and order-shaped intents."""
 
-    return "negotiation" if state["intent"] in NEGOTIATION_INTENTS else "respond"
+    if state["intent"] in NEGOTIATION_INTENTS or state["intent"] in CHECKOUT_INTENTS:
+        return "negotiation"
+    return "respond"
 
 
 def route_after_negotiation(state: TurnState) -> str:
-    """Pause at the approval gate when an approval is pending, else end the turn."""
+    """Pause at the approval gate, route an order to checkout, else end the turn."""
 
-    return "await_approval" if state.get("pending_approval_id") else END
+    if state.get("pending_approval_id"):
+        return "await_approval"
+    if state["intent"] in CHECKOUT_INTENTS:
+        return "checkout"
+    return END
+
+
+def route_after_apply_decision(state: TurnState) -> str:
+    """After an approved discount on an order, continue to checkout; else end."""
+
+    if state["intent"] in CHECKOUT_INTENTS and state.get("final_outcome") in (
+        "approved",
+        "overridden",
+    ):
+        return "checkout"
+    return END
 
 
 async def respond_node(state: TurnState) -> dict[str, Any]:
@@ -124,6 +157,7 @@ def build_graph(checkpointer: Any) -> Any:
     graph.add_node("negotiation", negotiation_node)
     graph.add_node("await_approval", await_approval_node)
     graph.add_node("apply_decision", apply_decision_node)
+    graph.add_node("checkout", checkout_node)
     graph.add_node("respond", respond_node)
     graph.add_node("handoff", handoff_node)
     graph.add_edge(START, "classify_intent")
@@ -135,7 +169,7 @@ def build_graph(checkpointer: Any) -> Any:
     graph.add_conditional_edges(
         "supervisor",
         route_from_supervisor,
-        {"recommendation": "recommendation", "respond": "respond"},
+        {"recommendation": "recommendation", "respond": "respond", "checkout": "checkout"},
     )
     graph.add_conditional_edges(
         "recommendation",
@@ -145,10 +179,15 @@ def build_graph(checkpointer: Any) -> Any:
     graph.add_conditional_edges(
         "negotiation",
         route_after_negotiation,
-        {"await_approval": "await_approval", END: END},
+        {"await_approval": "await_approval", "checkout": "checkout", END: END},
     )
     graph.add_edge("await_approval", "apply_decision")
-    graph.add_edge("apply_decision", END)
+    graph.add_conditional_edges(
+        "apply_decision",
+        route_after_apply_decision,
+        {"checkout": "checkout", END: END},
+    )
+    graph.add_edge("checkout", END)
     graph.add_conditional_edges(
         "respond",
         route_after_respond,
@@ -167,4 +206,4 @@ def graph_tool_names(compiled: Any) -> set[str]:
     bound to those nodes on ``compiled``.
     """
 
-    return set(RECOMMENDATION_TOOL_NAMES) | set(NEGOTIATION_TOOL_NAMES)
+    return set(RECOMMENDATION_TOOL_NAMES) | set(NEGOTIATION_TOOL_NAMES) | set(CHECKOUT_TOOL_NAMES)

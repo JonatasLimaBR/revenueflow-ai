@@ -1,7 +1,11 @@
 from langgraph.checkpoint.memory import MemorySaver
 
 from revenueflow.agents.graph import build_graph, graph_tool_names
-from revenueflow.tools.registry import NEGOTIATION_TOOL_NAMES, RECOMMENDATION_TOOL_NAMES
+from revenueflow.tools.registry import (
+    CHECKOUT_TOOL_NAMES,
+    NEGOTIATION_TOOL_NAMES,
+    RECOMMENDATION_TOOL_NAMES,
+)
 
 ALLOWED = {
     "recommendation": {
@@ -59,7 +63,7 @@ def test_recommendation_tool_names_disjoint_from_write_tools() -> None:
 def test_graph_reachable_tools_stay_within_registry() -> None:
     compiled = build_graph(MemorySaver())
     assert graph_tool_names(compiled) <= (
-        set(RECOMMENDATION_TOOL_NAMES) | set(NEGOTIATION_TOOL_NAMES)
+        set(RECOMMENDATION_TOOL_NAMES) | set(NEGOTIATION_TOOL_NAMES) | set(CHECKOUT_TOOL_NAMES)
     )
 
 
@@ -78,6 +82,8 @@ def test_negotiation_tool_names_disjoint_from_write_tools() -> None:
     assert NEGOTIATION_TOOL_NAMES.isdisjoint(write_tools)
 
 
-def test_graph_reachable_tools_match_both_registries() -> None:
+def test_graph_reachable_tools_match_declared_registries() -> None:
     compiled = build_graph(MemorySaver())
-    assert graph_tool_names(compiled) == RECOMMENDATION_TOOL_NAMES | NEGOTIATION_TOOL_NAMES
+    assert graph_tool_names(compiled) == (
+        set(RECOMMENDATION_TOOL_NAMES) | set(NEGOTIATION_TOOL_NAMES) | set(CHECKOUT_TOOL_NAMES)
+    )

@@ -1,12 +1,12 @@
-"""Agent tool registries -- the security boundary (D5, SPEC-024/025).
+"""Agent tool registries -- the security boundary (D5, SPEC-024/025, ADR-037/051).
 
-``RECOMMENDATION_TOOLS`` and ``NEGOTIATION_TOOLS`` are the explicit allowlists of
-tools each agent may call. Every entry is read-only or deterministic. No
-``set_discount``, ``create_quote``, ``create_order``, ``create_payment_sandbox``,
-``send_whatsapp_direct``, or any other write tool belongs in either list, and the
-Negotiation Agent in particular gets no ``set_discount`` and no ``create_*``.
-Widening any registry requires a reviewed code change and a new ADR, not a config
-toggle.
+``RECOMMENDATION_TOOLS``, ``NEGOTIATION_TOOLS`` and ``CHECKOUT_TOOLS`` are the
+explicit allowlists of tools each agent may call. Every entry is read-only or
+deterministic. ``create_quote`` / ``create_order`` / ``create_payment_sandbox``
+live only in ``CHECKOUT_TOOLS`` -- no other agent sees them -- and the checkout
+tools never appear in the recommendation or negotiation lists. ``set_discount``
+and ``send_whatsapp_direct`` are in no list at all. Widening any registry
+requires a reviewed code change and a new ADR, not a config toggle.
 """
 
 from __future__ import annotations
@@ -20,6 +20,7 @@ from revenueflow.tools.catalog import (
     get_product_details,
     search_products,
 )
+from revenueflow.tools.checkout import create_order, create_payment_sandbox, create_quote
 from revenueflow.tools.pricing import calculate_margin, get_price, propose_allowed_discount
 
 RECOMMENDATION_TOOLS: Final[list[Callable[..., Awaitable[Any]]]] = [
@@ -46,4 +47,14 @@ NEGOTIATION_TOOLS: Final[list[Callable[..., Awaitable[Any]]]] = [
 
 NEGOTIATION_TOOL_NAMES: Final[frozenset[str]] = frozenset(
     {get_price.__name__, calculate_margin.__name__, propose_allowed_discount.__name__}
+)
+
+CHECKOUT_TOOLS: Final[list[Callable[..., Awaitable[Any]]]] = [
+    create_quote,
+    create_order,
+    create_payment_sandbox,
+]
+
+CHECKOUT_TOOL_NAMES: Final[frozenset[str]] = frozenset(
+    {create_quote.__name__, create_order.__name__, create_payment_sandbox.__name__}
 )
