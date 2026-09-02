@@ -32,7 +32,7 @@ Fatias entregues, arquivadas em `.claude/sdd/archive/`:
 
 Em revisão:
 
-- **APPROVAL_RESUME** (2026-09-02, ADR-050) — fecha o fire-and-stop: `POST /internal/approvals/{id}`
+- **APPROVAL_RESUME** (2026-09-02, PR #32, ADR-050) — fecha o fire-and-stop: `POST /internal/approvals/{id}`
   (Bearer `APPROVAL_API_TOKEN`) transiciona o `Approval` e publica `approval_decided`; o consumer
   pega `pg_advisory_xact_lock(conversation_id)` e retoma o grafo com `Command(resume=…)`. Novo nó
   `apply_decision_node` determinístico (approve / approve_with_override / reject / expired). `0004`
