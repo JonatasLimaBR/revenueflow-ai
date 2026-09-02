@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
 from enum import StrEnum
+from typing import Any
 
 
 class SessionStatus(StrEnum):
@@ -120,3 +121,49 @@ class Approval:
     expires_at: datetime | None = None
     approved_discount: Decimal | None = None
     decided_at: datetime | None = None
+
+
+class QuoteStatus(StrEnum):
+    SENT = "SENT"
+    ACCEPTED = "ACCEPTED"
+    EXPIRED = "EXPIRED"
+
+
+class OrderStatus(StrEnum):
+    CONFIRMED = "CONFIRMED"
+    PAID = "PAID"
+    FAILED = "FAILED"
+
+
+class PaymentStatus(StrEnum):
+    APPROVED = "APPROVED"
+    DECLINED = "DECLINED"
+
+
+@dataclass(slots=True)
+class Quote:
+    quote_id: str
+    conversation_id: str
+    customer_ref: str | None
+    items: list[dict[str, Any]]
+    total: Decimal
+    expiration: datetime
+    status: QuoteStatus
+
+
+@dataclass(slots=True)
+class Order:
+    order_id: str
+    quote_id: str
+    customer_ref: str | None
+    items: list[dict[str, Any]]
+    total: Decimal
+    status: OrderStatus
+
+
+@dataclass(slots=True)
+class Payment:
+    payment_id: str
+    order_id: str
+    amount: Decimal
+    status: PaymentStatus

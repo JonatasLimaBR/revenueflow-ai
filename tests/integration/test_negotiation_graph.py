@@ -31,6 +31,8 @@ async def test_in_policy_discount_is_proposed_without_approval(db: None) -> None
     assert result["intent"] == Intent.PRICE_REQUEST.value
     assert result["final_outcome"] in {"proposed", "quoted"}
     assert "__interrupt__" not in result
+    assert result["requested_quantity"] >= 1
+    assert "checkout_discount" in result
 
     async with read_connection() as conn:
         row = await fetchone(

@@ -24,6 +24,8 @@ class TurnState(TurnInput, total=False):
     tool_results: list[dict[str, Any]]
     requested_discount: str | None
     requested_quantity: int | None
+    checkout_discount: str
+    open_quote_id: str | None
     price_quote: dict[str, Any]
     policy_decision: dict[str, Any]
     pending_approval_id: str | None

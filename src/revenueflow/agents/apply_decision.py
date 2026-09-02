@@ -65,4 +65,9 @@ async def apply_decision_node(state: TurnState) -> dict[str, Any]:
             f"Aprovado: {applied:.0%} de desconto para {qty} un — "
             f"R$ {final} (valido ate {valid_until})."
         )
-        return {"reply": reply, "final_outcome": outcome, "current_agent": "negotiation"}
+        return {
+            "reply": reply,
+            "final_outcome": outcome,
+            "checkout_discount": str(applied),
+            "current_agent": "negotiation",
+        }

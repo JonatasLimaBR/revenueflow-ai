@@ -82,6 +82,8 @@ async def negotiation_node(state: TurnState) -> dict[str, Any]:
                 "reply": reply,
                 "final_outcome": "quoted",
                 "price_quote": quote,
+                "requested_quantity": qty,
+                "checkout_discount": "0",
                 "current_agent": "negotiation",
             }
 
@@ -106,6 +108,8 @@ async def negotiation_node(state: TurnState) -> dict[str, Any]:
                 "final_outcome": "proposed",
                 "price_quote": quote,
                 "policy_decision": decision,
+                "requested_quantity": qty,
+                "checkout_discount": str(applied),
                 "current_agent": "negotiation",
             }
 
