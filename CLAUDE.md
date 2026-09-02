@@ -29,9 +29,6 @@ Fatias entregues, arquivadas em `.claude/sdd/archive/`:
   nó terminal `handoff` (resposta fixa de encaminhamento, nada gerado). Prompts `v2` com moldura
   anti-injection. Eval contra o modelo real em `tests/ai_eval/test_vertex_eval.py` (marker
   `live`, fora do CI). **Produção roda `LLM_STUB=0`; dev local e CI mantêm o stub como default.**
-
-Em revisão:
-
 - **APPROVAL_RESUME** (2026-09-02, PR #32, ADR-050) — fecha o fire-and-stop: `POST /internal/approvals/{id}`
   (Bearer `APPROVAL_API_TOKEN`) transiciona o `Approval` e publica `approval_decided`; o consumer
   pega `pg_advisory_xact_lock(conversation_id)` e retoma o grafo com `Command(resume=…)`. Novo nó
