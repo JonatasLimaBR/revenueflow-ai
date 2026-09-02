@@ -11,9 +11,15 @@ from __future__ import annotations
 from typing import Any
 
 from revenueflow.observability import get_tracer
+from revenueflow.repositories import customer as customer_repo
 from revenueflow.repositories import sim_catalog, sim_inventory, sim_sales
 from revenueflow.repositories.db import read_connection
-from revenueflow.tools.schemas import InventoryView, ProductSummary, SalesRow
+from revenueflow.tools.schemas import (
+    Customer360View,
+    InventoryView,
+    ProductSummary,
+    SalesRow,
+)
 
 
 async def search_products(query: str, limit: int = 5) -> list[dict[str, Any]]:
@@ -57,3 +63,12 @@ async def get_customer_sales_context(customer_id: str, limit: int = 10) -> list[
         async with read_connection() as conn:
             rows = await sim_sales.context_for(conn, customer_id, limit=limit)
         return [SalesRow(**row).model_dump(mode="json") for row in rows]
+
+
+async def get_customer_360(customer_id: str) -> dict[str, Any]:
+    """Return the bounded commercial view for a known customer (SPEC-017, ADR-033)."""
+
+    with get_tracer().span("tool.get_customer_360", attrs={"customer_id": customer_id}):
+        async with read_connection() as conn:
+            view = await customer_repo.customer_360(conn, customer_id)
+        return Customer360View(**view).model_dump(mode="json")

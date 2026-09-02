@@ -167,3 +167,12 @@ class Payment:
     order_id: str
     amount: Decimal
     status: PaymentStatus
+
+
+@dataclass(slots=True)
+class Customer:
+    customer_id: str
+    phone: str
+    name: str | None
+    segment: str | None
+    created_at: datetime

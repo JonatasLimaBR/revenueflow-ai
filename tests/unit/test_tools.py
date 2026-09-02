@@ -19,6 +19,11 @@ def test_checkout_tool_names_are_isolated() -> None:
     assert CHECKOUT_TOOL_NAMES == {"create_quote", "create_order", "create_payment_sandbox"}
 
 
+def test_customer_360_tool_is_recommendation_only() -> None:
+    assert "get_customer_360" in RECOMMENDATION_TOOL_NAMES
+    assert "get_customer_360" not in (NEGOTIATION_TOOL_NAMES | CHECKOUT_TOOL_NAMES)
+
+
 def test_graph_tool_names_include_checkout() -> None:
     names = graph_tool_names(build_graph(MemorySaver()))
     assert CHECKOUT_TOOL_NAMES <= names

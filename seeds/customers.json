@@ -1,0 +1,20 @@
+[
+  {
+    "customer_id": "CUST-001",
+    "phone": "5511900000001",
+    "name": "Comercial Agua Viva Ltda",
+    "segment": "gold"
+  },
+  {
+    "customer_id": "CUST-002",
+    "phone": "5511900000002",
+    "name": "Irrigacao Vale Verde ME",
+    "segment": "silver"
+  },
+  {
+    "customer_id": "CUST-003",
+    "phone": "5511900000003",
+    "name": "Bomba Rapida Servicos",
+    "segment": "bronze"
+  }
+]

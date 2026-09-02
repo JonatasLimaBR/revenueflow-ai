@@ -49,6 +49,24 @@ ON CONFLICT (customer_id, product_id) DO UPDATE SET
     max_discount_pct = EXCLUDED.max_discount_pct
 """
 
+UPSERT_CUSTOMER = """
+INSERT INTO customer (customer_id, phone, name, segment)
+VALUES (%s, %s, %s, %s)
+ON CONFLICT (phone) DO UPDATE SET
+    customer_id = EXCLUDED.customer_id,
+    name = EXCLUDED.name,
+    segment = EXCLUDED.segment
+"""
+
+UPSERT_CUSTOMER_ORDER = """
+INSERT INTO sim_customer_order (customer_id, order_id, total, ordered_at, items)
+VALUES (%s, %s, %s, %s, %s)
+ON CONFLICT (customer_id, order_id) DO UPDATE SET
+    total = EXCLUDED.total,
+    ordered_at = EXCLUDED.ordered_at,
+    items = EXCLUDED.items
+"""
+
 
 def _load(name: str) -> list[dict[str, Any]]:
     payload: list[dict[str, Any]] = json.loads((SEEDS_DIR / name).read_text(encoding="utf-8"))
@@ -61,6 +79,8 @@ def main() -> int:
     customer_sales = _load("customer_sales.json")
     product_cost = _load("product_cost.json")
     customer_pricing = _load("customer_pricing.json")
+    customers = _load("customers.json")
+    customer_orders = _load("customer_orders.json")
 
     settings = get_settings()
     with psycopg.connect(settings.database_url) as conn:
@@ -115,12 +135,34 @@ def main() -> int:
                         Decimal(str(pricing["max_discount_pct"])),
                     ),
                 )
+            for entry in customers:
+                cur.execute(
+                    UPSERT_CUSTOMER,
+                    (
+                        entry["customer_id"],
+                        entry["phone"],
+                        entry.get("name"),
+                        entry.get("segment"),
+                    ),
+                )
+            for order in customer_orders:
+                cur.execute(
+                    UPSERT_CUSTOMER_ORDER,
+                    (
+                        order["customer_id"],
+                        order["order_id"],
+                        Decimal(str(order["total"])),
+                        order["ordered_at"],
+                        Jsonb(order.get("items", [])),
+                    ),
+                )
         conn.commit()
 
     print(
         f"seeded sim_product={len(products)} sim_inventory={len(inventory)} "
         f"sim_customer_sales={len(customer_sales)} product_cost={len(product_cost)} "
-        f"sim_customer_pricing={len(customer_pricing)}"
+        f"sim_customer_pricing={len(customer_pricing)} customer={len(customers)} "
+        f"sim_customer_order={len(customer_orders)}"
     )
     return 0
 

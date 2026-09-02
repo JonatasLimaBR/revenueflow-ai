@@ -97,6 +97,9 @@ async def process_event(
             return True
 
         customer_id, lead_id = await resolve(phone)
+        if customer_id is not None:
+            async with unit_of_work() as conn:
+                await session_repo.set_customer(conn, session.conversation_id, customer_id)
         state_in: dict[str, Any] = {
             "conversation_id": session.conversation_id,
             "customer_text": text,

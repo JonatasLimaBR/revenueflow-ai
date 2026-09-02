@@ -15,6 +15,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any, Final
 
 from revenueflow.tools.catalog import (
+    get_customer_360,
     get_customer_sales_context,
     get_inventory,
     get_product_details,
@@ -28,6 +29,7 @@ RECOMMENDATION_TOOLS: Final[list[Callable[..., Awaitable[Any]]]] = [
     get_product_details,
     get_inventory,
     get_customer_sales_context,
+    get_customer_360,
 ]
 
 RECOMMENDATION_TOOL_NAMES: Final[frozenset[str]] = frozenset(
@@ -36,6 +38,7 @@ RECOMMENDATION_TOOL_NAMES: Final[frozenset[str]] = frozenset(
         get_product_details.__name__,
         get_inventory.__name__,
         get_customer_sales_context.__name__,
+        get_customer_360.__name__,
     }
 )
 

@@ -1,6 +1,7 @@
 """Tool boundary for the Recommendation and Negotiation Agents (D5, SPEC-024/025)."""
 
 from revenueflow.tools.catalog import (
+    get_customer_360,
     get_customer_sales_context,
     get_inventory,
     get_product_details,
@@ -17,9 +18,12 @@ from revenueflow.tools.registry import (
     RECOMMENDATION_TOOLS,
 )
 from revenueflow.tools.schemas import (
+    Customer360Input,
+    Customer360View,
     CustomerSalesInput,
     InventoryInput,
     InventoryView,
+    OpenQuotes,
     ProductDetailsInput,
     ProductSummary,
     SalesRow,
@@ -33,9 +37,12 @@ __all__ = [
     "NEGOTIATION_TOOL_NAMES",
     "RECOMMENDATION_TOOLS",
     "RECOMMENDATION_TOOL_NAMES",
+    "Customer360Input",
+    "Customer360View",
     "CustomerSalesInput",
     "InventoryInput",
     "InventoryView",
+    "OpenQuotes",
     "ProductDetailsInput",
     "ProductSummary",
     "SalesRow",
@@ -44,6 +51,7 @@ __all__ = [
     "create_order",
     "create_payment_sandbox",
     "create_quote",
+    "get_customer_360",
     "get_customer_sales_context",
     "get_inventory",
     "get_price",
