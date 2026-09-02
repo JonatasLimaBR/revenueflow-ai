@@ -45,6 +45,15 @@ async def get_open_by_phone(conn: AsyncConnection[Any], phone: str) -> Conversat
     return _to_session(row) if row is not None else None
 
 
+async def phone_for(conn: AsyncConnection[Any], conversation_id: str) -> str | None:
+    row = await fetchone(
+        conn,
+        "SELECT phone FROM conversation_session WHERE conversation_id = %s",
+        (conversation_id,),
+    )
+    return None if row is None else str(row["phone"])
+
+
 async def create(conn: AsyncConnection[Any], session: ConversationSession) -> None:
     current_intent = session.current_intent.value if session.current_intent is not None else None
     await execute(

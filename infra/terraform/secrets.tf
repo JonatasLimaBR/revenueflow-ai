@@ -9,6 +9,7 @@ locals {
     WHATSAPP_PHONE_NUMBER_ID = "revenueflow-whatsapp-phone-number-id"
     LANGFUSE_PUBLIC_KEY      = "revenueflow-langfuse-public-key"
     LANGFUSE_SECRET_KEY      = "revenueflow-langfuse-secret-key"
+    APPROVAL_API_TOKEN       = "revenueflow-approval-api-token"
   }
 }
 

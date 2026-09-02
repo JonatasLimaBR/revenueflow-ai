@@ -10,6 +10,7 @@ graph stops until a human decides (SPEC-011/012, ADR-039/037/012).
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 from uuid import uuid4
@@ -17,6 +18,7 @@ from uuid import uuid4
 from langgraph.types import interrupt
 
 from revenueflow.agents.state import TurnState
+from revenueflow.config import get_settings
 from revenueflow.domain.models import Approval, ApprovalStatus
 from revenueflow.observability import get_tracer
 from revenueflow.repositories import approval as approval_repo
@@ -107,6 +109,7 @@ async def negotiation_node(state: TurnState) -> dict[str, Any]:
                 "current_agent": "negotiation",
             }
 
+        expires_at = datetime.now(UTC) + timedelta(hours=get_settings().approval_ttl_hours)
         approval = Approval(
             approval_id=uuid4().hex,
             conversation_id=state["conversation_id"],
@@ -118,6 +121,7 @@ async def negotiation_node(state: TurnState) -> dict[str, Any]:
             amount=(Decimal(quote["customer_price"]) * qty).quantize(_CENT),
             customer_ref=customer_ref,
             status=ApprovalStatus.PENDING,
+            expires_at=expires_at,
         )
         async with unit_of_work() as conn:
             await approval_repo.create_pending(conn, approval)
@@ -126,14 +130,19 @@ async def negotiation_node(state: TurnState) -> dict[str, Any]:
         "reply": _PENDING_REPLY,
         "pending_approval_id": approval.approval_id,
         "policy_decision": decision,
+        "price_quote": quote,
+        "requested_quantity": qty,
+        "requested_discount": str(requested),
         "final_outcome": "pending_approval",
         "current_agent": "negotiation",
     }
 
 
 async def await_approval_node(state: TurnState) -> dict[str, Any]:
-    """Fire the persistent interrupt so the graph pauses for a human decision."""
+    """Pause for a human decision; on resume return the decision payload."""
 
     with get_tracer().span("node.await_approval"):
-        interrupt({"approval_id": state["pending_approval_id"]})
-    return {}
+        decision = interrupt(
+            {"approval_id": state["pending_approval_id"], "reason": "discount_out_of_policy"}
+        )
+    return {"approval_decision": decision}

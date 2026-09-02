@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     pricing_min_margin_pct: Decimal = Decimal("0.15")
     pricing_max_discount_pct: Decimal = Decimal("0.10")
 
+    approval_api_token: str = ""
+    approval_ttl_hours: int = 24
+
     langfuse_host: str = ""
     langfuse_public_key: str = ""
     langfuse_secret_key: str = ""
