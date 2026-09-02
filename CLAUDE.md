@@ -35,20 +35,18 @@ Fatias entregues, arquivadas em `.claude/sdd/archive/`:
   `apply_decision_node` determinístico (approve / approve_with_override / reject / expired). `0004`
   adiciona `expires_at`/`approved_discount`/`decided_at`. Mensagem nova durante o `interrupt` →
   "sua solicitação ainda está em análise".
-
-Em revisão:
-
 - **CHECKOUT** (2026-09-02, PR #35, ADR-051) — fecha a venda: `ORDER_REQUEST` → `checkout_node`
   determinístico gera `Quote(SENT)` a partir do preço resolvido e pede "sim, pode fechar"; a
   próxima mensagem cai no gate (`get_open_quote` no `supervisor` + `is_explicit_confirmation`
   pura, SPEC-014) → cria `sales_order` idempotente por `quote_id`, revalida estoque, roda
-  `create_payment_sandbox` (fake `APPROVED`). `CHECKOUT_TOOLS` isolado (nenhum outro agente vê
-  `create_*`). `0005` adiciona `quote`/`sales_order`/`payment` + índice único parcial.
+  `create_payment_sandbox` (fake `APPROVED`, sem dado de cartão). `CHECKOUT_TOOLS` isolado
+  (nenhum outro agente vê `create_*`). `0005` adiciona `quote`/`sales_order`/`payment` + índice
+  único parcial. `apply_decision` ganha aresta `→ {checkout, END}` para o pós-aprovação.
 
 Deploy: o ambiente GCP está no ar (Cloud Run `revenueflow-api`, Cloud SQL, Pub/Sub, Cloud Run
 Job `revenueflow-api-migrate`) via `.github/workflows/terraform.yml` (ADR-048); schema + catálogo
-simulado aplicados. Pendências operacionais: valores reais dos secrets do WhatsApp e registro do
-webhook no Meta.
+simulado aplicados. Pendências operacionais: valores reais dos secrets do WhatsApp, registro do
+webhook no Meta e `gcloud run jobs execute revenueflow-api-migrate` para aplicar a `0005`.
 
 O código de aplicação **existe** e não é mais scaffolding.
 
