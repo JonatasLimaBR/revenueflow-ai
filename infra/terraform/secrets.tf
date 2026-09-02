@@ -56,6 +56,20 @@ resource "google_secret_manager_secret_version" "db_url" {
   secret_data = "postgresql://${google_sql_user.app.name}:${random_password.db.result}@/${google_sql_database.app.name}?host=/cloudsql/${google_sql_database_instance.oltp.connection_name}"
 }
 
+# The approval-route bearer token (ADR-050). Terraform generates the first value
+# so the deploy is not gated on a manual `gcloud secrets versions add`; rotate
+# later by adding a new version. Read the current one with:
+#   gcloud secrets versions access latest --secret=revenueflow-approval-api-token
+resource "random_password" "approval_token" {
+  length  = 48
+  special = false
+}
+
+resource "google_secret_manager_secret_version" "approval_api_token" {
+  secret      = google_secret_manager_secret.manual["APPROVAL_API_TOKEN"].id
+  secret_data = random_password.approval_token.result
+}
+
 resource "google_secret_manager_secret_iam_member" "api_manual" {
   for_each  = google_secret_manager_secret.manual
   secret_id = each.value.secret_id

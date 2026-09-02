@@ -74,11 +74,11 @@ nenhuma chave de service account em lugar nenhum.
     printf '%s' "$WA_ACCESS_TOKEN"    | gcloud secrets versions add revenueflow-whatsapp-access-token    --data-file=-
     printf '%s' "$WA_VERIFY_TOKEN"    | gcloud secrets versions add revenueflow-whatsapp-verify-token    --data-file=-
     printf '%s' "$WA_PHONE_NUMBER_ID" | gcloud secrets versions add revenueflow-whatsapp-phone-number-id --data-file=-
-    openssl rand -hex 32              | gcloud secrets versions add revenueflow-approval-api-token        --data-file=-
     ```
-    O `revenueflow-approval-api-token` (ADR-050) é o Bearer da rota interna de aprovação — gere
-    um valor aleatório e guarde para o operador. Sem versão, a revisão do Cloud Run não fica
-    healthy (o secret é montado no container).
+    O `revenueflow-approval-api-token` (ADR-050) é gerado pelo próprio Terraform (`random_password`
+    + `google_secret_manager_secret_version`), então não entra aqui. O operador lê o valor com
+    `gcloud secrets versions access latest --secret=revenueflow-approval-api-token`; para rotacionar,
+    adicione uma versão nova e redeploye.
 
 ## Fase 4 — Build da imagem
 
