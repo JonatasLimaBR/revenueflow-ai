@@ -117,3 +117,6 @@ class Approval:
     amount: Decimal
     customer_ref: str | None
     status: ApprovalStatus
+    expires_at: datetime | None = None
+    approved_discount: Decimal | None = None
+    decided_at: datetime | None = None

@@ -14,11 +14,16 @@ from typing import Any
 
 from revenueflow.config import get_settings
 from revenueflow.events.envelope import from_json
-from revenueflow.worker.consume import process_event
+from revenueflow.worker.consume import process_approval_decided, process_event
 
 _LOGGER = logging.getLogger(__name__)
 
 _SUBSCRIPTION = "revenueflow.messages"
+
+_ROUTES = {
+    "message_received": process_event,
+    "approval_decided": process_approval_decided,
+}
 
 
 async def run_subscriber() -> None:
@@ -33,8 +38,13 @@ async def run_subscriber() -> None:
 
     def _handle(message: Any) -> None:
         try:
-            future = asyncio.run_coroutine_threadsafe(process_event(from_json(message.data)), loop)
-            future.result()
+            envelope = from_json(message.data)
+            handler = _ROUTES.get(envelope.event_type)
+            if handler is None:
+                _LOGGER.warning("unknown event_type %s; acking", envelope.event_type)
+                message.ack()
+                return
+            asyncio.run_coroutine_threadsafe(handler(envelope), loop).result()
         except Exception:
             _LOGGER.exception("consumer failed; nacking message")
             message.nack()

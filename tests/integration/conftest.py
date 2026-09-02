@@ -68,6 +68,17 @@ def whatsapp_settings(monkeypatch: pytest.MonkeyPatch) -> Iterator[str]:
 
 
 @pytest.fixture
+def approval_settings(monkeypatch: pytest.MonkeyPatch) -> Iterator[str]:
+    """Set a known ``APPROVAL_API_TOKEN``; yield it."""
+
+    token = "test-approval-token"
+    monkeypatch.setenv("APPROVAL_API_TOKEN", token)
+    get_settings.cache_clear()
+    yield token
+    get_settings.cache_clear()
+
+
+@pytest.fixture
 def publisher() -> Iterator[InMemoryPublisher]:
     """Install an ``InMemoryPublisher`` for the duration of the test."""
 

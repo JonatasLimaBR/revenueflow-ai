@@ -70,11 +70,15 @@ nenhuma chave de service account em lugar nenhum.
 
 12. O Terraform cria os *containers*; os valores entram à mão:
     ```
-    printf '%s' "$WA_APP_SECRET"     | gcloud secrets versions add revenueflow-whatsapp-app-secret     --data-file=-
-    printf '%s' "$WA_ACCESS_TOKEN"   | gcloud secrets versions add revenueflow-whatsapp-access-token   --data-file=-
-    printf '%s' "$WA_VERIFY_TOKEN"   | gcloud secrets versions add revenueflow-whatsapp-verify-token   --data-file=-
-    printf '%s' "$WA_PHONE_NUMBER_ID"| gcloud secrets versions add revenueflow-whatsapp-phone-number-id --data-file=-
+    printf '%s' "$WA_APP_SECRET"      | gcloud secrets versions add revenueflow-whatsapp-app-secret      --data-file=-
+    printf '%s' "$WA_ACCESS_TOKEN"    | gcloud secrets versions add revenueflow-whatsapp-access-token    --data-file=-
+    printf '%s' "$WA_VERIFY_TOKEN"    | gcloud secrets versions add revenueflow-whatsapp-verify-token    --data-file=-
+    printf '%s' "$WA_PHONE_NUMBER_ID" | gcloud secrets versions add revenueflow-whatsapp-phone-number-id --data-file=-
+    openssl rand -hex 32              | gcloud secrets versions add revenueflow-approval-api-token        --data-file=-
     ```
+    O `revenueflow-approval-api-token` (ADR-050) é o Bearer da rota interna de aprovação — gere
+    um valor aleatório e guarde para o operador. Sem versão, a revisão do Cloud Run não fica
+    healthy (o secret é montado no container).
 
 ## Fase 4 — Build da imagem
 
@@ -112,6 +116,18 @@ nenhuma chave de service account em lugar nenhum.
     `LANGFUSE_HOST`), `DATABASE_URL` via secret `revenueflow-database-url` (DSN com socket
     `/cloudsql/<conn>`), `secret_key_ref` para os 4 secrets do WhatsApp (+ os 2 do Langfuse
     quando `tracer_sink=langfuse`), volume do Cloud SQL, e `min_instance_count = var.min_instances`.
+17b. **Aprovação de desconto (ADR-050).** Para decidir um `Approval(PENDING)`:
+     ```
+     TOKEN=$(gcloud secrets versions access latest --secret=revenueflow-approval-api-token --project=<PROJECT_ID>)
+     URL=https://<cloud-run-url>
+     curl -s -H "Authorization: Bearer $TOKEN" "$URL/internal/approvals?status=PENDING"
+     curl -s -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+       -d '{"decision":"approve_with_override","discount_pct":"0.18"}' \
+       "$URL/internal/approvals/<approval_id>"
+     ```
+     O `POST` transiciona o `approval` e publica `approval_decided`; o consumer retoma o turno e
+     envia o preço final ao cliente. Repetir o `POST` é no-op (`200`).
+
 17. **Entrega Pub/Sub → worker: decidido pelo ADR-047** — pull, com `min_instances >= 1`, e o
     consumidor roda no mesmo serviço (`run_subscriber()` iniciado no `main.lifespan`). Isso é uma
     mudança de **código do app** (companheira deste PR de infra); Terraform sozinho entrega um

@@ -12,6 +12,7 @@ from typing import Any
 
 from langgraph.graph import END, START, StateGraph
 
+from revenueflow.agents.apply_decision import apply_decision_node
 from revenueflow.agents.negotiation import await_approval_node, negotiation_node
 from revenueflow.agents.recommendation import recommendation_node
 from revenueflow.agents.state import TurnState
@@ -122,6 +123,7 @@ def build_graph(checkpointer: Any) -> Any:
     graph.add_node("recommendation", recommendation_node)
     graph.add_node("negotiation", negotiation_node)
     graph.add_node("await_approval", await_approval_node)
+    graph.add_node("apply_decision", apply_decision_node)
     graph.add_node("respond", respond_node)
     graph.add_node("handoff", handoff_node)
     graph.add_edge(START, "classify_intent")
@@ -145,7 +147,8 @@ def build_graph(checkpointer: Any) -> Any:
         route_after_negotiation,
         {"await_approval": "await_approval", END: END},
     )
-    graph.add_edge("await_approval", END)
+    graph.add_edge("await_approval", "apply_decision")
+    graph.add_edge("apply_decision", END)
     graph.add_conditional_edges(
         "respond",
         route_after_respond,

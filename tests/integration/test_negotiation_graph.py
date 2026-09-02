@@ -58,17 +58,21 @@ async def test_out_of_policy_discount_opens_pending_approval(db: None) -> None:
     assert result["final_outcome"] == "pending_approval"
     assert "__interrupt__" in result
     assert "aprova" in result["reply"].lower()
+    assert result["price_quote"]["customer_price"]
+    assert result["requested_quantity"] >= 1
+    assert result["requested_discount"]
 
     async with read_connection() as conn:
         rows = await fetchall(
             conn,
-            "SELECT status, resulting_margin FROM approval "
+            "SELECT status, resulting_margin, expires_at FROM approval "
             "WHERE conversation_id = %s AND turn_id = %s",
             (conversation_id, turn_id),
         )
     assert len(rows) == 1
     assert rows[0]["status"] == "PENDING"
     assert rows[0]["resulting_margin"] is not None
+    assert rows[0]["expires_at"] is not None
 
 
 async def test_out_of_policy_target_price_opens_pending_approval(db: None) -> None:

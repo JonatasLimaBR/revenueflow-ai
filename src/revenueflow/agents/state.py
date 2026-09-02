@@ -27,6 +27,7 @@ class TurnState(TurnInput, total=False):
     price_quote: dict[str, Any]
     policy_decision: dict[str, Any]
     pending_approval_id: str | None
+    approval_decision: dict[str, Any]
     final_outcome: str
     reply: str
     handoff: bool

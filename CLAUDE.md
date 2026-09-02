@@ -30,6 +30,15 @@ Fatias entregues, arquivadas em `.claude/sdd/archive/`:
   anti-injection. Eval contra o modelo real em `tests/ai_eval/test_vertex_eval.py` (marker
   `live`, fora do CI). **Produção roda `LLM_STUB=0`; dev local e CI mantêm o stub como default.**
 
+Em revisão:
+
+- **APPROVAL_RESUME** (2026-09-02, ADR-050) — fecha o fire-and-stop: `POST /internal/approvals/{id}`
+  (Bearer `APPROVAL_API_TOKEN`) transiciona o `Approval` e publica `approval_decided`; o consumer
+  pega `pg_advisory_xact_lock(conversation_id)` e retoma o grafo com `Command(resume=…)`. Novo nó
+  `apply_decision_node` determinístico (approve / approve_with_override / reject / expired). `0004`
+  adiciona `expires_at`/`approved_discount`/`decided_at`. Mensagem nova durante o `interrupt` →
+  "sua solicitação ainda está em análise".
+
 Deploy: o ambiente GCP está no ar (Cloud Run `revenueflow-api`, Cloud SQL, Pub/Sub, Cloud Run
 Job `revenueflow-api-migrate`) via `.github/workflows/terraform.yml` (ADR-048); schema + catálogo
 simulado aplicados. Pendências operacionais: valores reais dos secrets do WhatsApp e registro do
@@ -39,9 +48,10 @@ O código de aplicação **existe** e não é mais scaffolding.
 
 Fluxo que roda: `POST /webhook/whatsapp` (HMAC) → Pub/Sub `message_received` → `process_event`
 idempotente → sessão + lead provisório → grafo LangGraph `classify_intent → supervisor →
-recommendation → {respond | negotiation → [await_approval]}` (checkpointer PostgreSQL) →
-resposta ancorada / proposta de desconto / "encaminhado para aprovação" / handoff em falha de
-LLM → `ChannelOutbound.send`.
+recommendation → {respond | negotiation → [await_approval → apply_decision]}` (checkpointer
+PostgreSQL) → resposta ancorada / proposta de desconto / "encaminhado para aprovação" / preço
+final aprovado / handoff em falha de LLM → `ChannelOutbound.send`. A retomada da aprovação chega
+por `POST /internal/approvals/{id}` → evento `approval_decided` → consumer com advisory lock.
 
 Mapa de `src/revenueflow/`:
 
@@ -54,11 +64,11 @@ Mapa de `src/revenueflow/`:
 | `adapters` | portas de canal; `verify_signature` + `parse_inbound`; `WhatsAppOutbound` + `FakeOutbound` |
 | `repositories` | pool async psycopg; `processed_event`/`dispatch` (idempotência); `session`/`lead`; `sim_*`; `sim_pricing`; `approval` |
 | `policies` | `pricing_policy.evaluate()` — regra pura de alçada/margem, sem I/O nem LLM |
-| `services` | `ingest`, `session`, `identity`, `prompts` (v2, anti-injection), `llm` (stub + Vertex real: `_generate_with_retry`, lazy `google-genai`), `intent`, `respond`, `pricing`, `negotiation` |
+| `services` | `ingest`, `session` (+`phone_for`), `identity`, `prompts` (v2, anti-injection), `llm` (stub + Vertex real), `intent`, `respond`, `pricing`, `negotiation`, `approval` (decide + list_pending) |
 | `tools` | `RECOMMENDATION_TOOLS` (4 read-only) + `NEGOTIATION_TOOLS` (3 de pricing) + `registry` (fronteira — nenhuma tool de escrita, nenhum `set_discount`) |
-| `agents` | `TurnState`; `recommendation_node`; `negotiation_node` + `await_approval_node` (`interrupt`); `handoff_node` (falha de LLM); `build_graph` (checkpointer Postgres) |
-| `api` | `webhook` (GET verify + POST 202), `health` (`/healthz`) |
-| `worker` | `process_event` (consumidor idempotente), `subscriber` (loop Pub/Sub real) |
+| `agents` | `TurnState`; `recommendation_node`; `negotiation_node` + `await_approval_node` (`interrupt`) + `apply_decision_node` (retomada, ADR-050); `handoff_node` (falha de LLM); `build_graph` (checkpointer Postgres) |
+| `api` | `webhook` (GET verify + POST 202), `health` (`/healthz`), `approvals` (`/internal/approvals`, Bearer) |
+| `worker` | `process_event` + `process_approval_decided` (consumidores idempotentes), `subscriber` (loop Pub/Sub, roteia por `event_type`) |
 
 Portas com impl `noop`/`in_memory`/`fake` por default: a suíte roda só com `postgres:16`. Os
 caminhos reais (`google-genai`, `google-cloud-pubsub`, `httpx` para a Graph API, `langfuse`) são
@@ -297,3 +307,4 @@ Claude deve localizar e ler os documentos relacionados antes de implementar.
 - [ADR-047 — Cloud Run consome o Pub/Sub por pull, com min_instances >= 1 na V1](docs/adrs/adr-047-cloud-run-consumes-pub-sub-by-pull-with-min-instance.md)
 - [ADR-048 — CD via GitHub Actions + Workload Identity Federation, sem chave](docs/adrs/adr-048-github-actions-wif-keyless-cd.md)
 - [ADR-049 — Vertex AI via google-genai (vertexai=True), com retry e handoff](docs/adrs/adr-049-vertex-ai-via-google-genai.md)
+- [ADR-050 — Retomada da aprovação: rota interna + evento Pub/Sub + Command(resume)](docs/adrs/adr-050-approval-resume-via-internal-route-and-event.md)
