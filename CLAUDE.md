@@ -52,10 +52,24 @@ Fatias entregues, arquivadas em `.claude/sdd/archive/`:
   ramo `if customer_id:` (substitui `get_customer_sales_context`); falha →
   `{"error": "unavailable"}` + log com `trace_id`. `0006` cria `customer` + `sim_customer_order`.
 
+Em revisão:
+
+- **OPPORTUNITY_ENGINE** (2026-09-03, ADR-053) — detecção de oportunidade por **regra
+  determinística**, em batch, **fora do grafo** (ADR-019). `services.opportunity.scan()` puxa
+  candidatos (recompra atrasada: `days_since_last_purchase > average_purchase_interval * threshold`;
+  quote parada: `SENT` sem `sales_order` além do limite), roda `policies.opportunity_policy`
+  (funções puras, `now` injetável, sem LLM/agents/adapters) e faz `upsert_open` idempotente
+  (índice único parcial `opportunity (customer_id, opportunity_type, product) WHERE status='OPEN'`).
+  Cada `opportunity` guarda `reason` + `evidence` jsonb (SPEC-021). **Gera opportunity, não
+  mensagem** (SPEC-022 — outreach é a fatia OUTBOUND). `probability` fixo por tipo (placeholder,
+  ADR-018). Roda pelo Cloud Run Job `revenueflow-opportunity-scan` on-demand (`scripts/detect_opportunities.py`);
+  Cloud Scheduler diário é follow-up. `0007` cria `opportunity`.
+
 Deploy: o ambiente GCP está no ar (Cloud Run `revenueflow-api`, Cloud SQL, Pub/Sub, Cloud Run
-Job `revenueflow-api-migrate`) via `.github/workflows/terraform.yml` (ADR-048); schema + catálogo
-simulado aplicados. Pendências operacionais: valores reais dos secrets do WhatsApp, registro do
-webhook no Meta e `gcloud run jobs execute revenueflow-api-migrate` para aplicar `0005`/`0006`.
+Jobs `revenueflow-api-migrate` e `revenueflow-opportunity-scan`) via
+`.github/workflows/terraform.yml` (ADR-048); schema + catálogo simulado aplicados. Pendências
+operacionais: valores reais dos secrets do WhatsApp, registro do webhook no Meta e
+`gcloud run jobs execute revenueflow-api-migrate` para aplicar `0005`/`0006`/`0007`.
 
 O código de aplicação **existe** e não é mais scaffolding.
 
@@ -74,13 +88,13 @@ Mapa de `src/revenueflow/`:
 | Pacote | Papel |
 |---|---|
 | `config` | `Settings` tipado (pydantic-settings) + flags `CHANNEL_OUTBOUND`/`TRACER_SINK`/`LLM_STUB`; `google_cloud_project`/`vertex_location`/`llm_max_retries` |
-| `domain` | erros tipados; enums `SessionStatus`/`LeadStatus`/`Intent`/`ApprovalStatus`/`QuoteStatus`/`OrderStatus`/`PaymentStatus`; dataclasses de entidade (`Quote`/`Order`/`Payment`/`Customer` incl.) |
+| `domain` | erros tipados; enums `SessionStatus`/`LeadStatus`/`Intent`/`ApprovalStatus`/`QuoteStatus`/`OrderStatus`/`PaymentStatus`/`OpportunityType`/`OpportunityStatus`; dataclasses de entidade (`Quote`/`Order`/`Payment`/`Customer`/`Opportunity` incl.) |
 | `observability` | `mask()` de PII; porta `Tracer` (`noop`/`langfuse`/`otel`); `cost_usd()` |
 | `events` | `EventEnvelope`; porta `EventPublisher` (`in_memory`/`pubsub`) |
 | `adapters` | portas de canal; `verify_signature` + `parse_inbound`; `WhatsAppOutbound` + `FakeOutbound` |
-| `repositories` | pool async psycopg; `processed_event`/`dispatch` (idempotência); `session` (+`set_customer`)/`lead`/`customer` (`get_by_phone`/`customer_360`); `sim_*`; `sim_pricing`; `approval`; `checkout` (quote/order/payment) |
-| `policies` | `pricing_policy.evaluate()` — regra pura de alçada/margem, sem I/O nem LLM |
-| `services` | `ingest`, `session` (+`phone_for`), `identity` (`customer` antes do `lead`), `prompts` (v2), `llm` (stub + Vertex real), `intent`, `respond`, `pricing`, `negotiation`, `approval`, `checkout` (`is_explicit_confirmation` + `quote_from_state` + `confirm`) |
+| `repositories` | pool async psycopg; `processed_event`/`dispatch` (idempotência); `session` (+`set_customer`)/`lead`/`customer` (`get_by_phone`/`customer_360`); `sim_*`; `sim_pricing`; `approval`; `checkout` (quote/order/payment); `opportunity` (`upsert_open`/`list_by_status`/`set_status` + queries de candidatos) |
+| `policies` | `pricing_policy.evaluate()` (alçada/margem) + `opportunity_policy` (`replenishment`/`quote_recovery`) — regras puras, sem I/O nem LLM |
+| `services` | `ingest`, `session` (+`phone_for`), `identity` (`customer` antes do `lead`), `prompts` (v2), `llm` (stub + Vertex real), `intent`, `respond`, `pricing`, `negotiation`, `approval`, `checkout` (`is_explicit_confirmation` + `quote_from_state` + `confirm`), `opportunity` (`scan()` — batch, fora do grafo) |
 | `tools` | `RECOMMENDATION_TOOLS` (5 read-only, incl. `get_customer_360`) + `NEGOTIATION_TOOLS` (3 de pricing) + `CHECKOUT_TOOLS` (`create_quote`/`create_order`/`create_payment_sandbox`, determinísticas, registry isolado) + `registry` (fronteira — nenhum `set_discount`) |
 | `agents` | `TurnState`; `recommendation_node` (anexa `get_customer_360` p/ cliente conhecido); `negotiation_node` + `await_approval_node` + `apply_decision_node` (ADR-050); `checkout_node` (quote/confirmação/order/payment, ADR-051); `handoff_node`; `build_graph` |
 | `api` | `webhook` (GET verify + POST 202), `health` (`/healthz`), `approvals` (`/internal/approvals`, Bearer) |
@@ -326,3 +340,4 @@ Claude deve localizar e ler os documentos relacionados antes de implementar.
 - [ADR-050 — Retomada da aprovação: rota interna + evento Pub/Sub + Command(resume)](docs/adrs/adr-050-approval-resume-via-internal-route-and-event.md)
 - [ADR-051 — Checkout Agent determinístico + CHECKOUT_TOOLS; confirmação determinística](docs/adrs/adr-051-checkout-agent-deterministic.md)
 - [ADR-052 — Customer 360: identidade determinística por telefone + visão comercial limitada tool-gated](docs/adrs/adr-052-customer-360-identity-and-bounded-view.md)
+- [ADR-053 — Opportunity Engine determinístico: scan em batch + regras puras + entidade](docs/adrs/adr-053-opportunity-engine-deterministic-batch.md)
