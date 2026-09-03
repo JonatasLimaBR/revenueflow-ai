@@ -176,3 +176,29 @@ class Customer:
     name: str | None
     segment: str | None
     created_at: datetime
+
+
+class OpportunityType(StrEnum):
+    REPLENISHMENT = "REPLENISHMENT"
+    QUOTE_RECOVERY = "QUOTE_RECOVERY"
+
+
+class OpportunityStatus(StrEnum):
+    OPEN = "OPEN"
+    CONVERTED = "CONVERTED"
+    DISMISSED = "DISMISSED"
+
+
+@dataclass(slots=True)
+class Opportunity:
+    opportunity_id: str
+    customer_id: str
+    opportunity_type: OpportunityType
+    product: str | None
+    estimated_revenue: Decimal | None
+    probability: Decimal | None
+    reason: str
+    evidence: dict[str, Any]
+    recommended_action: str
+    status: OpportunityStatus
+    created_at: datetime

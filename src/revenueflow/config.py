@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     approval_api_token: str = ""
     approval_ttl_hours: int = 24
 
+    replenishment_threshold: float = 1.5
+    quote_recovery_hours: int = 72
+
     langfuse_host: str = ""
     langfuse_public_key: str = ""
     langfuse_secret_key: str = ""
