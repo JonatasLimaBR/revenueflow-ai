@@ -78,6 +78,14 @@ async def update_status(
     await execute(conn, _UPDATE_STATUS, (status.value, conversation_id))
 
 
+async def set_customer(conn: AsyncConnection[Any], conversation_id: str, customer_id: str) -> None:
+    await execute(
+        conn,
+        "UPDATE conversation_session SET customer_id = %s WHERE conversation_id = %s",
+        (customer_id, conversation_id),
+    )
+
+
 async def touch(
     conn: AsyncConnection[Any],
     conversation_id: str,

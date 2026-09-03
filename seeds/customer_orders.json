@@ -1,0 +1,30 @@
+[
+  {
+    "customer_id": "CUST-001",
+    "order_id": "SO-HIST-001A",
+    "total": 6799.00,
+    "ordered_at": "2026-07-01T10:00:00Z",
+    "items": [{"product_id": "PMP-100-CEN", "quantity": 10}]
+  },
+  {
+    "customer_id": "CUST-001",
+    "order_id": "SO-HIST-001B",
+    "total": 3599.00,
+    "ordered_at": "2026-04-15T10:00:00Z",
+    "items": [{"product_id": "PMP-050-PER", "quantity": 10}]
+  },
+  {
+    "customer_id": "CUST-001",
+    "order_id": "SO-HIST-001C",
+    "total": 12000.00,
+    "ordered_at": "2025-06-20T10:00:00Z",
+    "items": [{"product_id": "PMP-100-PER", "quantity": 20}]
+  },
+  {
+    "customer_id": "CUST-002",
+    "order_id": "SO-HIST-002A",
+    "total": 1500.00,
+    "ordered_at": "2026-07-20T10:00:00Z",
+    "items": [{"product_id": "PMP-050-PER", "quantity": 4}]
+  }
+]

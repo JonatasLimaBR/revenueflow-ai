@@ -14,16 +14,19 @@ derivation stands in for the query formulation the model will own later.
 
 from __future__ import annotations
 
+import logging
 import re
 from typing import Any
 
 from revenueflow.agents.state import TurnState
 from revenueflow.observability import get_tracer
 from revenueflow.tools.catalog import (
-    get_customer_sales_context,
+    get_customer_360,
     get_inventory,
     search_products,
 )
+
+_LOGGER = logging.getLogger(__name__)
 
 _TERM = re.compile(r"[0-9A-Za-zÀ-ÿ']{3,}")
 
@@ -58,6 +61,11 @@ async def recommendation_node(state: TurnState) -> dict[str, Any]:
             tool_results.append({"tool": "get_inventory", "result": inventory})
         customer_id = state.get("customer_id")
         if customer_id:
-            sales = await get_customer_sales_context(customer_id)
-            tool_results.append({"tool": "get_customer_sales_context", "result": sales})
+            try:
+                context = await get_customer_360(customer_id)
+                tool_results.append({"tool": "get_customer_360", "result": context})
+            except Exception:
+                get_tracer().event("customer_360.unavailable", attrs={"customer_id": customer_id})
+                _LOGGER.exception("customer_360 failed for %s", customer_id)
+                tool_results.append({"tool": "get_customer_360", "error": "unavailable"})
     return {"tool_results": tool_results}

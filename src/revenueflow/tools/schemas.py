@@ -8,6 +8,7 @@ cite fields that appear here.
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 from typing import Any
 
 from pydantic import BaseModel
@@ -65,3 +66,28 @@ class SalesRow(BaseModel):
     product_id: str
     last_qty: int
     last_order_at: datetime
+
+
+class Customer360Input(BaseModel):
+    """Arguments for :func:`revenueflow.tools.catalog.get_customer_360`."""
+
+    customer_id: str
+
+
+class OpenQuotes(BaseModel):
+    """Open quotes for a known customer."""
+
+    count: int
+    quote_ids: list[str]
+
+
+class Customer360View(BaseModel):
+    """Bounded commercial view for a known customer (SPEC-017, ADR-033)."""
+
+    orders_12m: int
+    revenue_12m: Decimal
+    average_ticket: Decimal
+    last_purchase: datetime | None
+    purchase_interval_days: float | None
+    preferred_products: list[str]
+    open_quotes: OpenQuotes

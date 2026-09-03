@@ -13,6 +13,7 @@ ALLOWED = {
         "get_product_details",
         "get_inventory",
         "get_customer_sales_context",
+        "get_customer_360",
     },
     "negotiation": {"get_price", "calculate_margin", "propose_allowed_discount"},
     "checkout": {
@@ -46,6 +47,7 @@ def test_recommendation_tool_names_are_exact() -> None:
         "get_product_details",
         "get_inventory",
         "get_customer_sales_context",
+        "get_customer_360",
     }
 
 
