@@ -17,6 +17,7 @@ from uuid import uuid4
 
 from langgraph.types import interrupt
 
+from revenueflow.agents.handoff import to_handoff
 from revenueflow.agents.state import TurnState
 from revenueflow.config import get_settings
 from revenueflow.domain.models import Approval, ApprovalStatus
@@ -62,6 +63,11 @@ async def negotiation_node(state: TurnState) -> dict[str, Any]:
         qty = ask.quantity or 1
         customer_ref = state.get("customer_id")
         quote = await tools_pricing.get_price(customer_ref, product_id, qty)
+
+        threshold = get_settings().handoff_high_value_threshold
+        if Decimal(quote["customer_price"]) * qty > threshold:
+            return to_handoff("high_value_order") | {"current_agent": "negotiation"}
+
         valid_until = quote["valid_until"]
 
         requested: Decimal | None

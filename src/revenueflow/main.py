@@ -16,7 +16,12 @@ from fastapi import FastAPI
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
 from revenueflow.agents import build_graph
-from revenueflow.api import approvals_router, health_router, webhook_router
+from revenueflow.api import (
+    approvals_router,
+    handoffs_router,
+    health_router,
+    webhook_router,
+)
 from revenueflow.config import get_settings
 from revenueflow.repositories.db import close_pool, open_pool
 from revenueflow.worker import set_graph
@@ -48,3 +53,4 @@ app = FastAPI(title="RevenueFlow AI", lifespan=lifespan)
 app.include_router(webhook_router)
 app.include_router(health_router)
 app.include_router(approvals_router)
+app.include_router(handoffs_router)

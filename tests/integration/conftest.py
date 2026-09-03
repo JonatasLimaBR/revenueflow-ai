@@ -79,6 +79,17 @@ def approval_settings(monkeypatch: pytest.MonkeyPatch) -> Iterator[str]:
 
 
 @pytest.fixture
+def handoff_settings(monkeypatch: pytest.MonkeyPatch) -> Iterator[str]:
+    """Set a known ``HANDOFF_API_TOKEN``; yield it."""
+
+    token = "test-handoff-token"
+    monkeypatch.setenv("HANDOFF_API_TOKEN", token)
+    get_settings.cache_clear()
+    yield token
+    get_settings.cache_clear()
+
+
+@pytest.fixture
 def publisher() -> Iterator[InMemoryPublisher]:
     """Install an ``InMemoryPublisher`` for the duration of the test."""
 

@@ -62,11 +62,25 @@ Fatias entregues, arquivadas em `.claude/sdd/archive/`:
   ADR-018). Roda pelo Cloud Run Job `revenueflow-opportunity-scan` on-demand (`scripts/detect_opportunities.py`);
   Cloud Scheduler diário é follow-up. `0007` cria `opportunity`.
 
+Em revisão:
+
+- **HUMAN_HANDOFF** (2026-09-03, ADR-054) — transfere a conversa para um humano em 3 gatilhos
+  determinísticos: pedido explícito (`Intent.HUMAN_SUPPORT`, que antes caía em `respond`),
+  `low_confidence` da classificação, `high_value_order` (`customer_price * qty` acima do teto,
+  checado no `negotiation_node` antes do checkout). `policies.handoff_policy.should_handoff` é
+  pura (precedência fixa, sem LLM). `agents/handoff.py` (novo módulo — quebra o ciclo
+  `graph ↔ negotiation`): `handoff_node` monta `services.handoff.build_context` (8 chaves da
+  SPEC-027, determinístico; `next_best_action` reusa a `opportunity` OPEN), persiste um `Handoff`
+  idempotente (índice único parcial `handoff (conversation_id) WHERE status='PENDING'`) e marca a
+  sessão `HUMAN_HANDOFF`. Handoff de falha de LLM também persiste. Rota `GET/POST
+  /internal/handoffs` (Bearer `HANDOFF_API_TOKEN`, novo secret Terraform-generated). Guard no
+  `process_event`: sessão em `HUMAN_HANDOFF` → frase fixa, sem grafo. `0008` cria `handoff`.
+
 Deploy: o ambiente GCP está no ar (Cloud Run `revenueflow-api`, Cloud SQL, Pub/Sub, Cloud Run
 Jobs `revenueflow-api-migrate` e `revenueflow-opportunity-scan`) via
 `.github/workflows/terraform.yml` (ADR-048); schema + catálogo simulado aplicados. Pendências
 operacionais: valores reais dos secrets do WhatsApp, registro do webhook no Meta e
-`gcloud run jobs execute revenueflow-api-migrate` para aplicar `0005`/`0006`/`0007`.
+`gcloud run jobs execute revenueflow-api-migrate` para aplicar `0005`–`0008`.
 
 O código de aplicação **existe** e não é mais scaffolding.
 
@@ -85,16 +99,16 @@ Mapa de `src/revenueflow/`:
 | Pacote | Papel |
 |---|---|
 | `config` | `Settings` tipado (pydantic-settings) + flags `CHANNEL_OUTBOUND`/`TRACER_SINK`/`LLM_STUB`; `google_cloud_project`/`vertex_location`/`llm_max_retries` |
-| `domain` | erros tipados; enums `SessionStatus`/`LeadStatus`/`Intent`/`ApprovalStatus`/`QuoteStatus`/`OrderStatus`/`PaymentStatus`/`OpportunityType`/`OpportunityStatus`; dataclasses de entidade (`Quote`/`Order`/`Payment`/`Customer`/`Opportunity` incl.) |
+| `domain` | erros tipados; enums `SessionStatus` (+`HUMAN_HANDOFF`)/`LeadStatus`/`Intent`/`ApprovalStatus`/`QuoteStatus`/`OrderStatus`/`PaymentStatus`/`OpportunityType`/`OpportunityStatus`/`HandoffReason`/`HandoffStatus`; dataclasses de entidade (`Quote`/`Order`/`Payment`/`Customer`/`Opportunity`/`Handoff` incl.) |
 | `observability` | `mask()` de PII; porta `Tracer` (`noop`/`langfuse`/`otel`); `cost_usd()` |
 | `events` | `EventEnvelope`; porta `EventPublisher` (`in_memory`/`pubsub`) |
 | `adapters` | portas de canal; `verify_signature` + `parse_inbound`; `WhatsAppOutbound` + `FakeOutbound` |
-| `repositories` | pool async psycopg; `processed_event`/`dispatch` (idempotência); `session` (+`set_customer`)/`lead`/`customer` (`get_by_phone`/`customer_360`); `sim_*`; `sim_pricing`; `approval`; `checkout` (quote/order/payment); `opportunity` (`upsert_open`/`list_by_status`/`set_status` + queries de candidatos) |
-| `policies` | `pricing_policy.evaluate()` (alçada/margem) + `opportunity_policy` (`replenishment`/`quote_recovery`) — regras puras, sem I/O nem LLM |
-| `services` | `ingest`, `session` (+`phone_for`), `identity` (`customer` antes do `lead`), `prompts` (v2), `llm` (stub + Vertex real), `intent`, `respond`, `pricing`, `negotiation`, `approval`, `checkout` (`is_explicit_confirmation` + `quote_from_state` + `confirm`), `opportunity` (`scan()` — batch, fora do grafo) |
+| `repositories` | pool async psycopg; `processed_event`/`dispatch` (idempotência); `session` (+`set_customer`)/`lead`/`customer` (`get_by_phone`/`customer_360`); `sim_*`; `sim_pricing`; `approval`; `checkout` (quote/order/payment); `opportunity` (`upsert_open`/`list_by_status`/`set_status` + queries de candidatos); `handoff` (`create` idempotente/`list_by_status`/`resolve`) |
+| `policies` | `pricing_policy.evaluate()` (alçada/margem) + `opportunity_policy` (`replenishment`/`quote_recovery`) + `handoff_policy.should_handoff` (3 gatilhos) — regras puras, sem I/O nem LLM |
+| `services` | `ingest`, `session` (+`phone_for`), `identity` (`customer` antes do `lead`), `prompts` (v2), `llm` (stub + Vertex real), `intent`, `respond`, `pricing`, `negotiation`, `approval`, `checkout` (`is_explicit_confirmation` + `quote_from_state` + `confirm`), `opportunity` (`scan()` — batch, fora do grafo), `handoff` (`build_context` SPEC-027 + `create`/`list_pending`/`resolve`) |
 | `tools` | `RECOMMENDATION_TOOLS` (5 read-only, incl. `get_customer_360`) + `NEGOTIATION_TOOLS` (3 de pricing) + `CHECKOUT_TOOLS` (`create_quote`/`create_order`/`create_payment_sandbox`, determinísticas, registry isolado) + `registry` (fronteira — nenhum `set_discount`) |
-| `agents` | `TurnState`; `recommendation_node` (anexa `get_customer_360` p/ cliente conhecido); `negotiation_node` + `await_approval_node` + `apply_decision_node` (ADR-050); `checkout_node` (quote/confirmação/order/payment, ADR-051); `handoff_node`; `build_graph` |
-| `api` | `webhook` (GET verify + POST 202), `health` (`/healthz`), `approvals` (`/internal/approvals`, Bearer) |
+| `agents` | `TurnState`; `recommendation_node` (anexa `get_customer_360` p/ cliente conhecido); `negotiation_node` (+check `high_value_order`) + `await_approval_node` + `apply_decision_node` (ADR-050); `checkout_node` (quote/confirmação/order/payment, ADR-051); `handoff.py` (`to_handoff` + `handoff_node` que persiste + marca `HUMAN_HANDOFF`, ADR-054); `build_graph` |
+| `api` | `webhook` (GET verify + POST 202), `health` (`/healthz`), `approvals` (`/internal/approvals`, Bearer), `handoffs` (`/internal/handoffs`, Bearer) |
 | `worker` | `process_event` + `process_approval_decided` (consumidores idempotentes), `subscriber` (loop Pub/Sub, roteia por `event_type`) |
 
 Portas com impl `noop`/`in_memory`/`fake` por default: a suíte roda só com `postgres:16`. Os
@@ -338,3 +352,4 @@ Claude deve localizar e ler os documentos relacionados antes de implementar.
 - [ADR-051 — Checkout Agent determinístico + CHECKOUT_TOOLS; confirmação determinística](docs/adrs/adr-051-checkout-agent-deterministic.md)
 - [ADR-052 — Customer 360: identidade determinística por telefone + visão comercial limitada tool-gated](docs/adrs/adr-052-customer-360-identity-and-bounded-view.md)
 - [ADR-053 — Opportunity Engine determinístico: scan em batch + regras puras + entidade](docs/adrs/adr-053-opportunity-engine-deterministic-batch.md)
+- [ADR-054 — Human Handoff: gatilhos determinísticos + entidade + contexto estruturado](docs/adrs/adr-054-human-handoff-deterministic-triggers-and-context.md)

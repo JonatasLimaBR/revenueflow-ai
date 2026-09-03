@@ -14,12 +14,15 @@ from langgraph.graph import END, START, StateGraph
 
 from revenueflow.agents.apply_decision import apply_decision_node
 from revenueflow.agents.checkout import checkout_node
+from revenueflow.agents.handoff import handoff_node, to_handoff
 from revenueflow.agents.negotiation import await_approval_node, negotiation_node
 from revenueflow.agents.recommendation import recommendation_node
 from revenueflow.agents.state import TurnState
+from revenueflow.config import get_settings
 from revenueflow.domain.errors import LLMError
 from revenueflow.domain.models import Intent
 from revenueflow.observability import get_tracer
+from revenueflow.policies.handoff_policy import should_handoff
 from revenueflow.repositories import checkout as checkout_repo
 from revenueflow.repositories.db import unit_of_work
 from revenueflow.services import classify, generate
@@ -35,20 +38,6 @@ NEGOTIATION_INTENTS: frozenset[str] = frozenset(
 )
 CHECKOUT_INTENTS: frozenset[str] = frozenset({Intent.ORDER_REQUEST.value})
 
-_HANDOFF_REPLY = (
-    "Ainda nao localizei essa informacao por aqui; "
-    "um atendente humano vai dar sequencia ao seu atendimento."
-)
-
-
-def _to_handoff(reason: str) -> dict[str, Any]:
-    return {
-        "handoff": True,
-        "handoff_reason": reason,
-        "reply": _HANDOFF_REPLY,
-        "final_outcome": "handoff",
-    }
-
 
 async def classify_intent_node(state: TurnState) -> dict[str, Any]:
     """Classify the customer text into a controlled intent plus confidence."""
@@ -57,7 +46,17 @@ async def classify_intent_node(state: TurnState) -> dict[str, Any]:
         try:
             intent, confidence = await classify(state["customer_text"])
         except LLMError:
-            return _to_handoff("intent")
+            return to_handoff("intent")
+    settings = get_settings()
+    reason = should_handoff(
+        intent=intent.value,
+        confidence=confidence,
+        resolved_total=None,
+        min_confidence=settings.handoff_min_confidence,
+        high_value_threshold=settings.handoff_high_value_threshold,
+    )
+    if reason is not None:
+        return to_handoff(reason.value)
     return {"intent": intent.value, "confidence": confidence}
 
 
@@ -77,8 +76,10 @@ def route_after_classify(state: TurnState) -> str:
 
 
 def route_from_supervisor(state: TurnState) -> str:
-    """Open quote -> confirmation gate; reco/negotiation/order intents -> agent path."""
+    """Explicit human request -> handoff; open quote -> gate; agent intents -> path."""
 
+    if state["intent"] == Intent.HUMAN_SUPPORT.value:
+        return "handoff"
     if state.get("open_quote_id"):
         return "checkout"
     if (
@@ -99,8 +100,10 @@ def route_after_recommendation(state: TurnState) -> str:
 
 
 def route_after_negotiation(state: TurnState) -> str:
-    """Pause at the approval gate, route an order to checkout, else end the turn."""
+    """Handoff on a high-value order, pause at approval, route to checkout, else end."""
 
+    if state.get("handoff"):
+        return "handoff"
     if state.get("pending_approval_id"):
         return "await_approval"
     if state["intent"] in CHECKOUT_INTENTS:
@@ -130,15 +133,8 @@ async def respond_node(state: TurnState) -> dict[str, Any]:
                 tool_results=state.get("tool_results", []),
             )
         except LLMError:
-            return _to_handoff("respond")
+            return to_handoff("respond")
     return {"reply": reply}
-
-
-async def handoff_node(state: TurnState) -> dict[str, Any]:
-    """Terminal node for a model failure: the reply is already the fixed sentence."""
-
-    get_tracer().end(outcome="handoff", handoff=True)
-    return {}
 
 
 def route_after_respond(state: TurnState) -> str:
@@ -169,7 +165,12 @@ def build_graph(checkpointer: Any) -> Any:
     graph.add_conditional_edges(
         "supervisor",
         route_from_supervisor,
-        {"recommendation": "recommendation", "respond": "respond", "checkout": "checkout"},
+        {
+            "recommendation": "recommendation",
+            "respond": "respond",
+            "checkout": "checkout",
+            "handoff": "handoff",
+        },
     )
     graph.add_conditional_edges(
         "recommendation",
@@ -179,7 +180,12 @@ def build_graph(checkpointer: Any) -> Any:
     graph.add_conditional_edges(
         "negotiation",
         route_after_negotiation,
-        {"await_approval": "await_approval", "checkout": "checkout", END: END},
+        {
+            "await_approval": "await_approval",
+            "checkout": "checkout",
+            "handoff": "handoff",
+            END: END,
+        },
     )
     graph.add_edge("await_approval", "apply_decision")
     graph.add_conditional_edges(

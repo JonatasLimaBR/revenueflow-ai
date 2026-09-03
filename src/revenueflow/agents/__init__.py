@@ -3,6 +3,7 @@
 from revenueflow.agents.apply_decision import apply_decision_node
 from revenueflow.agents.checkout import checkout_node
 from revenueflow.agents.graph import build_graph
+from revenueflow.agents.handoff import handoff_node
 from revenueflow.agents.negotiation import await_approval_node, negotiation_node
 from revenueflow.agents.recommendation import recommendation_node
 from revenueflow.agents.state import TurnState
@@ -13,6 +14,7 @@ __all__ = [
     "await_approval_node",
     "build_graph",
     "checkout_node",
+    "handoff_node",
     "negotiation_node",
     "recommendation_node",
 ]
