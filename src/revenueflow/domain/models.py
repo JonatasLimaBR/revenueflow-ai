@@ -226,3 +226,23 @@ class Handoff:
     context: dict[str, Any]
     status: HandoffStatus
     created_at: datetime
+
+
+@dataclass(slots=True)
+class AuditEvent:
+    audit_id: str
+    trace_id: str
+    conversation_id: str
+    turn_id: str
+    agent: str | None
+    model: str | None
+    prompt_version: str | None
+    outcome: str
+    policy_decision: str | None
+    handoff: bool
+    tools: list[str]
+    token_usage: int
+    cost_usd: Decimal
+    latency_ms: int | None
+    events: list[dict[str, Any]]
+    created_at: datetime | None = None

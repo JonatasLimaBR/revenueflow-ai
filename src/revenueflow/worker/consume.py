@@ -132,6 +132,7 @@ async def process_event(
             _LOGGER.debug("tracer end after failure also failed", exc_info=True)
         raise
     finally:
+        await get_tracer().flush()
         reset_tracer(token)
 
 
@@ -187,4 +188,5 @@ async def process_approval_decided(
             _LOGGER.debug("tracer end after failure also failed", exc_info=True)
         raise
     finally:
+        await get_tracer().flush()
         reset_tracer(token)
