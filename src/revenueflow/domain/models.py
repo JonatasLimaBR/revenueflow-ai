@@ -8,6 +8,7 @@ from typing import Any
 class SessionStatus(StrEnum):
     OPEN = "OPEN"
     WAITING_CUSTOMER = "WAITING_CUSTOMER"
+    HUMAN_HANDOFF = "HUMAN_HANDOFF"
     CLOSED = "CLOSED"
 
 
@@ -201,4 +202,27 @@ class Opportunity:
     evidence: dict[str, Any]
     recommended_action: str
     status: OpportunityStatus
+    created_at: datetime
+
+
+class HandoffReason(StrEnum):
+    EXPLICIT_REQUEST = "explicit_request"
+    LOW_CONFIDENCE = "low_confidence"
+    HIGH_VALUE_ORDER = "high_value_order"
+    INTENT = "intent"
+    RESPOND = "respond"
+
+
+class HandoffStatus(StrEnum):
+    PENDING = "PENDING"
+    RESOLVED = "RESOLVED"
+
+
+@dataclass(slots=True)
+class Handoff:
+    handoff_id: str
+    conversation_id: str
+    reason: HandoffReason
+    context: dict[str, Any]
+    status: HandoffStatus
     created_at: datetime

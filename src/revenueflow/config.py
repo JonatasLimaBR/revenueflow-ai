@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     replenishment_threshold: float = 1.5
     quote_recovery_hours: int = 72
 
+    handoff_api_token: str = ""
+    handoff_min_confidence: float = 0.55
+    handoff_high_value_threshold: Decimal = Decimal("50000")
+
     langfuse_host: str = ""
     langfuse_public_key: str = ""
     langfuse_secret_key: str = ""

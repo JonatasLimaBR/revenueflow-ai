@@ -28,7 +28,12 @@ def test_intent_enum_matches_spec_005_vocabulary() -> None:
 
 
 def test_session_status_is_the_slice_subset() -> None:
-    assert {s.value for s in SessionStatus} == {"OPEN", "WAITING_CUSTOMER", "CLOSED"}
+    assert {s.value for s in SessionStatus} == {
+        "OPEN",
+        "WAITING_CUSTOMER",
+        "HUMAN_HANDOFF",
+        "CLOSED",
+    }
 
 
 def test_lead_status_matches_spec_004_vocabulary() -> None:

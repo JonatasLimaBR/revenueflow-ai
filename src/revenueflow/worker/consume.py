@@ -18,7 +18,7 @@ from typing import Any
 from langgraph.types import Command
 
 from revenueflow.adapters import ChannelOutbound, get_outbound
-from revenueflow.domain.models import Intent
+from revenueflow.domain.models import Intent, SessionStatus
 from revenueflow.events import EventEnvelope
 from revenueflow.observability import get_tracer, new_tracer, reset_tracer, set_tracer
 from revenueflow.repositories import dispatch, processed_event
@@ -29,6 +29,8 @@ from revenueflow.services import get_or_create, record_turn, resolve
 _HELD_FOR_APPROVAL = (
     "Sua solicitacao anterior ainda esta em analise; retornamos assim que aprovada."
 )
+
+_HELD_FOR_HANDOFF = "Sua conversa esta com um atendente humano; ele responde em breve."
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -83,6 +85,11 @@ async def process_event(
     phone = str(envelope.payload["phone"])
     text = str(envelope.payload["message_text"])
     session = await get_or_create(phone)
+    if session.status == SessionStatus.HUMAN_HANDOFF:
+        await _send_once(
+            session.conversation_id, envelope.event_id, phone, _HELD_FOR_HANDOFF, outbound
+        )
+        return True
     token = set_tracer(
         new_tracer(conversation_id=session.conversation_id, turn_id=envelope.event_id)
     )

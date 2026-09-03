@@ -24,6 +24,10 @@ _SELECT_BY_PHONE = (
     "SELECT customer_id, phone, name, segment, created_at FROM customer WHERE phone = %s"
 )
 
+_SELECT_BY_ID = (
+    "SELECT customer_id, phone, name, segment, created_at FROM customer WHERE customer_id = %s"
+)
+
 _INSERT = """
 INSERT INTO customer (customer_id, phone, name, segment)
 VALUES (%s, %s, %s, %s)
@@ -79,6 +83,11 @@ def _to_customer(row: dict[str, Any]) -> Customer:
 
 async def get_by_phone(conn: AsyncConnection[Any], phone: str) -> Customer | None:
     row = await fetchone(conn, _SELECT_BY_PHONE, (phone,))
+    return _to_customer(row) if row is not None else None
+
+
+async def get_by_id(conn: AsyncConnection[Any], customer_id: str) -> Customer | None:
+    row = await fetchone(conn, _SELECT_BY_ID, (customer_id,))
     return _to_customer(row) if row is not None else None
 
 

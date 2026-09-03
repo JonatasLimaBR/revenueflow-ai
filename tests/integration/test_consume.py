@@ -64,3 +64,37 @@ async def test_process_event_replies_and_persists(db: None, outbound: FakeOutbou
 
     assert await process_event(env, outbound=outbound) is False
     assert len(outbound.sent) == 1
+
+
+async def test_session_in_handoff_short_circuits(db: None, outbound: FakeOutbound) -> None:
+    from uuid import uuid4
+
+    from revenueflow.domain.models import SessionStatus
+    from revenueflow.repositories import session as session_repo
+    from revenueflow.repositories.db import unit_of_work
+    from revenueflow.services import get_or_create
+
+    phone = f"+5511{uuid4().hex[:9]}"
+    session = await get_or_create(phone)
+    async with unit_of_work() as conn:
+        await session_repo.update_status(conn, session.conversation_id, SessionStatus.HUMAN_HANDOFF)
+
+    env = make_envelope(
+        "message_received",
+        {
+            "event_id": "e-hoff",
+            "occurred_at": "2026-08-29T12:00:00+00:00",
+            "phone": phone,
+            "message_id": "wamid.hoff",
+            "message_type": "text",
+            "message_text": "ainda ai?",
+        },
+        trace_id="t-hoff",
+    )
+
+    assert await process_event(env, outbound=outbound) is True
+    assert len(outbound.sent) == 1
+    assert "atendente humano" in outbound.sent[0]["text"]
+
+    assert await process_event(env, outbound=outbound) is False
+    assert len(outbound.sent) == 1

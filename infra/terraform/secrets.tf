@@ -10,6 +10,7 @@ locals {
     LANGFUSE_PUBLIC_KEY      = "revenueflow-langfuse-public-key"
     LANGFUSE_SECRET_KEY      = "revenueflow-langfuse-secret-key"
     APPROVAL_API_TOKEN       = "revenueflow-approval-api-token"
+    HANDOFF_API_TOKEN        = "revenueflow-handoff-api-token"
   }
 }
 
@@ -68,6 +69,20 @@ resource "random_password" "approval_token" {
 resource "google_secret_manager_secret_version" "approval_api_token" {
   secret      = google_secret_manager_secret.manual["APPROVAL_API_TOKEN"].id
   secret_data = random_password.approval_token.result
+}
+
+# The handoff-route bearer token (ADR-054). Same Terraform-generated pattern as
+# the approval token so the deploy is not gated on a manual add; a separate
+# secret keeps the internal scopes isolated. Read the current one with:
+#   gcloud secrets versions access latest --secret=revenueflow-handoff-api-token
+resource "random_password" "handoff_token" {
+  length  = 48
+  special = false
+}
+
+resource "google_secret_manager_secret_version" "handoff_api_token" {
+  secret      = google_secret_manager_secret.manual["HANDOFF_API_TOKEN"].id
+  secret_data = random_password.handoff_token.result
 }
 
 resource "google_secret_manager_secret_iam_member" "api_manual" {
