@@ -86,10 +86,7 @@ Fatias entregues, arquivadas em `.claude/sdd/archive/`:
   `_send_once` (fora do P95). `0009` cria `audit_event` + views `v_ai_cost_per_conversation` /
   `v_ai_cost_per_outcome`. Rota `GET /internal/audit/{conversation_id}` (Bearer reusa
   `HANDOFF_API_TOKEN`). Sem infra nova.
-
-Em revisão:
-
-- **OBSERVABILITY_OPS** (2026-09-03, ADR-056) — fecha a SPEC-034. `AuditTracer.flush()` passa a
+- **OBSERVABILITY_OPS** (2026-09-03, PR #45, ADR-056) — fecha a SPEC-034. `AuditTracer.flush()` passa a
   emitir **uma** linha JSON `audit.turn` por turno (`conversation_id`/`outcome`/`agent`/`model`/
   `cost_usd`/`token_usage`/`latency_ms`/`handoff`/`tool_failures`) ao lado do `persist` —
   `observability/logging_setup.py` traz um `JsonFormatter` stdlib (sem dep) + `configure_logging()`
