@@ -29,6 +29,10 @@ _ROUTES = {
 async def run_subscriber() -> None:
     """Stream messages from the subscription and process each one exactly once."""
 
+    from revenueflow.observability.logging_setup import configure_logging
+
+    configure_logging()
+
     from google.cloud import pubsub_v1
 
     settings = get_settings()

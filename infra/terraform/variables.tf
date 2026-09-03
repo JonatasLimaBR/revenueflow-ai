@@ -78,3 +78,39 @@ variable "budget_amount_usd" {
   description = "Monthly budget threshold in USD for the budget alert"
   default     = 200
 }
+
+variable "alert_email" {
+  type        = string
+  description = "Address for the Cloud Monitoring email notification channel; empty disables notifications (ADR-056)"
+  default     = ""
+}
+
+variable "alert_5xx_ratio" {
+  type        = number
+  description = "5xx-to-total request ratio that fires the availability alert"
+  default     = 0.02
+}
+
+variable "alert_p95_latency_ms" {
+  type        = number
+  description = "Request p95 latency in ms that fires the latency alert"
+  default     = 3000
+}
+
+variable "alert_tool_failures_per_hour" {
+  type        = number
+  description = "Tool-exception count per hour that fires the tool-failure alert"
+  default     = 10
+}
+
+variable "alert_ai_cost_per_hour_usd" {
+  type        = number
+  description = "AI cost per hour in USD that fires the cost alert"
+  default     = 1.0
+}
+
+variable "alert_no_turns_minutes" {
+  type        = number
+  description = "Minutes without an audited turn that fires the consumer-liveness alert"
+  default     = 15
+}

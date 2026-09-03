@@ -1,7 +1,10 @@
 # ADR-045 — Langfuse self-hosted atrás de uma porta Tracer
 
 ## Status
-Accepted
+Accepted — **emendado pelo [ADR-056](adr-056-observability-ops-otel-cloud-trace-and-log-metrics.md)**
+quanto ao sink que roda em produção na V1: é **OTel → Cloud Trace** (serviço gerenciado, sem
+hosting), não Langfuse self-hosted. A porta `Tracer` e a impl `LangfuseTracer` continuam válidas;
+a troca é um tfvar (`tracer_sink = "langfuse"`).
 
 ## Contexto
 O ADR-040 exige tracing reconstruível desde a primeira fatia funcional: nó, tool, prompt, versão de prompt, tokens, custo, decisão de política e resultado final, com PII mascarada antes do sink. É preciso fixar a plataforma de tracing, o esquema do registro e os pontos de instrumentação sem acoplar o `domain` a bibliotecas de LLM.

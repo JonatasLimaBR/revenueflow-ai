@@ -463,7 +463,12 @@ class AuditTracer:
         if name.startswith("node."):
             self._agent = name[len("node.") :]
         with self._primary.span(name, attrs=attrs) as inner:
-            yield _BufferedSpan(entry, inner, time.perf_counter())
+            buffered = _BufferedSpan(entry, inner, time.perf_counter())
+            try:
+                yield buffered
+            except BaseException:
+                entry["error"] = True
+                raise
 
     @contextmanager
     def generation(
@@ -502,6 +507,19 @@ class AuditTracer:
         self._latency_ms = round((time.perf_counter() - self._started) * 1000)
         self._primary.end(outcome=outcome, policy_decision=policy_decision, handoff=handoff)
 
+    def _log_fields(self, *, tool_failures: int, cost: Decimal, tokens: int) -> dict[str, Any]:
+        return {
+            "conversation_id": self._conversation_id,
+            "outcome": self._outcome,
+            "agent": self._agent,
+            "model": self._model,
+            "cost_usd": float(cost),
+            "token_usage": tokens,
+            "latency_ms": self._latency_ms,
+            "handoff": self._handoff,
+            "tool_failures": tool_failures,
+        }
+
     async def flush(self) -> None:
         if self._flushed:
             return
@@ -523,6 +541,13 @@ class AuditTracer:
             for entry in self._events
             if entry["kind"] == "span" and str(entry["name"]).startswith("tool.")
         ]
+        tool_failures = sum(
+            1
+            for entry in self._events
+            if entry["kind"] == "span"
+            and str(entry["name"]).startswith("tool.")
+            and entry.get("error")
+        )
         await persist(
             AuditEvent(
                 audit_id=self._turn_id,
@@ -542,6 +567,13 @@ class AuditTracer:
                 events=self._events,
             )
         )
+        try:
+            _LOGGER.info(
+                "audit.turn",
+                extra=self._log_fields(tool_failures=tool_failures, cost=cost, tokens=tokens),
+            )
+        except Exception:
+            _LOGGER.warning("audit.turn log failed", exc_info=True)
 
 
 def _build_primary(*, conversation_id: str, turn_id: str) -> Tracer:

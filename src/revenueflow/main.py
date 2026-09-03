@@ -24,6 +24,7 @@ from revenueflow.api import (
     webhook_router,
 )
 from revenueflow.config import get_settings
+from revenueflow.observability.logging_setup import configure_logging
 from revenueflow.repositories.db import close_pool, open_pool
 from revenueflow.worker import set_graph
 from revenueflow.worker.subscriber import run_subscriber
@@ -33,8 +34,14 @@ from revenueflow.worker.subscriber import run_subscriber
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Open the pool and checkpointer for the life of the application."""
 
+    configure_logging()
+    settings = get_settings()
+    if settings.tracer_sink == "otel":
+        from revenueflow.observability.otel_setup import configure_otel
+
+        configure_otel()
     await open_pool()
-    async with AsyncPostgresSaver.from_conn_string(get_settings().database_url) as saver:
+    async with AsyncPostgresSaver.from_conn_string(settings.database_url) as saver:
         await saver.setup()
         set_graph(build_graph(saver))
         consumer: asyncio.Task[None] | None = None
