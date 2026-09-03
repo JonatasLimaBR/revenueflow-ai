@@ -25,10 +25,13 @@ def test_configure_otel_without_opentelemetry_is_a_warning(
 
 
 def _has_otel() -> bool:
-    return (
-        importlib.util.find_spec("opentelemetry.sdk.trace") is not None
-        and importlib.util.find_spec("opentelemetry.exporter.cloud_trace") is not None
-    )
+    try:
+        return (
+            importlib.util.find_spec("opentelemetry.sdk.trace") is not None
+            and importlib.util.find_spec("opentelemetry.exporter.cloud_trace") is not None
+        )
+    except ModuleNotFoundError:
+        return False
 
 
 @pytest.mark.skipif(not _has_otel(), reason="observability extra not installed")
