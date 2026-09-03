@@ -42,22 +42,20 @@ Fatias entregues, arquivadas em `.claude/sdd/archive/`:
   `create_payment_sandbox` (fake `APPROVED`, sem dado de cartão). `CHECKOUT_TOOLS` isolado
   (nenhum outro agente vê `create_*`). `0005` adiciona `quote`/`sales_order`/`payment` + índice
   único parcial. `apply_decision` ganha aresta `→ {checkout, END}` para o pós-aprovação.
-
-Em revisão:
-
-- **CUSTOMER_360** (2026-09-02, ADR-052) — reconhece o cliente recorrente pelo telefone e carrega
-  uma visão comercial limitada. `identity.resolve` consulta `customer` (telefone exato) antes do
-  lead; conhecido → `customer_id` real + `conversation_session.customer_id` gravado no
-  `process_event`. `repositories.customer.customer_360` agrega determinístico (janela de 365d,
-  `sim_customer_order` ∪ `sales_order`; `preferred_products` de `sim_customer_sales`; `open_quotes`
-  de `quote`). Tool estreita `get_customer_360` **só** em `RECOMMENDATION_TOOLS` (ADR-033);
-  `recommendation_node` a chama no ramo `if customer_id:` (substitui `get_customer_sales_context`);
-  falha → `{"error": "unavailable"}` + log. `0006` cria `customer` + `sim_customer_order`.
+- **CUSTOMER_360** (2026-09-03, PR #37, ADR-052) — reconhece o cliente recorrente pelo telefone e
+  carrega uma visão comercial limitada. `identity.resolve` consulta `customer` (telefone exato)
+  antes do lead; conhecido → `customer_id` real + `conversation_session.customer_id` gravado no
+  `process_event` (via `session_repo.set_customer`). `repositories.customer.customer_360` agrega
+  determinístico, sem LLM (janela de 365d, `sim_customer_order` ∪ `sales_order`;
+  `preferred_products` de `sim_customer_sales`; `open_quotes` de `quote`). Tool estreita
+  `get_customer_360` **só** em `RECOMMENDATION_TOOLS` (ADR-033); `recommendation_node` a chama no
+  ramo `if customer_id:` (substitui `get_customer_sales_context`); falha →
+  `{"error": "unavailable"}` + log com `trace_id`. `0006` cria `customer` + `sim_customer_order`.
 
 Deploy: o ambiente GCP está no ar (Cloud Run `revenueflow-api`, Cloud SQL, Pub/Sub, Cloud Run
 Job `revenueflow-api-migrate`) via `.github/workflows/terraform.yml` (ADR-048); schema + catálogo
 simulado aplicados. Pendências operacionais: valores reais dos secrets do WhatsApp, registro do
-webhook no Meta e `gcloud run jobs execute revenueflow-api-migrate` para aplicar a `0005`.
+webhook no Meta e `gcloud run jobs execute revenueflow-api-migrate` para aplicar `0005`/`0006`.
 
 O código de aplicação **existe** e não é mais scaffolding.
 
