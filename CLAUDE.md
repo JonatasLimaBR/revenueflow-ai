@@ -61,20 +61,19 @@ Fatias entregues, arquivadas em `.claude/sdd/archive/`:
   mensagem** (SPEC-022 — outreach é a fatia OUTBOUND). `probability` fixo por tipo (placeholder,
   ADR-018). Roda pelo Cloud Run Job `revenueflow-opportunity-scan` on-demand (`scripts/detect_opportunities.py`);
   Cloud Scheduler diário é follow-up. `0007` cria `opportunity`.
-
-Em revisão:
-
-- **HUMAN_HANDOFF** (2026-09-03, ADR-054) — transfere a conversa para um humano em 3 gatilhos
-  determinísticos: pedido explícito (`Intent.HUMAN_SUPPORT`, que antes caía em `respond`),
-  `low_confidence` da classificação, `high_value_order` (`customer_price * qty` acima do teto,
-  checado no `negotiation_node` antes do checkout). `policies.handoff_policy.should_handoff` é
-  pura (precedência fixa, sem LLM). `agents/handoff.py` (novo módulo — quebra o ciclo
-  `graph ↔ negotiation`): `handoff_node` monta `services.handoff.build_context` (8 chaves da
-  SPEC-027, determinístico; `next_best_action` reusa a `opportunity` OPEN), persiste um `Handoff`
-  idempotente (índice único parcial `handoff (conversation_id) WHERE status='PENDING'`) e marca a
-  sessão `HUMAN_HANDOFF`. Handoff de falha de LLM também persiste. Rota `GET/POST
-  /internal/handoffs` (Bearer `HANDOFF_API_TOKEN`, novo secret Terraform-generated). Guard no
-  `process_event`: sessão em `HUMAN_HANDOFF` → frase fixa, sem grafo. `0008` cria `handoff`.
+- **HUMAN_HANDOFF** (2026-09-03, PR #41, ADR-054) — transfere a conversa para um humano em 3
+  gatilhos determinísticos: pedido explícito (`Intent.HUMAN_SUPPORT`, que antes caía em
+  `respond`), `low_confidence` da classificação, `high_value_order` (`customer_price * qty` acima
+  do teto, checado no `negotiation_node` antes do checkout). O check de `low_confidence` /
+  `explicit_request` roda no `supervisor_node`, **depois** do gate de quote aberto.
+  `policies.handoff_policy.should_handoff` é pura (precedência fixa, sem LLM). `agents/handoff.py`
+  (módulo próprio — quebra o ciclo `graph ↔ negotiation`): `handoff_node` monta
+  `services.handoff.build_context` (8 chaves da SPEC-027, determinístico; `next_best_action`
+  reusa a `opportunity` OPEN), persiste um `Handoff` idempotente (índice único parcial
+  `handoff (conversation_id) WHERE status='PENDING'`) e marca a sessão `HUMAN_HANDOFF`. Handoff
+  de falha de LLM também persiste. Rota `GET/POST /internal/handoffs` (Bearer `HANDOFF_API_TOKEN`,
+  secret Terraform-generated). Guard no `process_event`: sessão em `HUMAN_HANDOFF` → frase fixa,
+  sem grafo. `0008` cria `handoff`.
 
 Deploy: o ambiente GCP está no ar (Cloud Run `revenueflow-api`, Cloud SQL, Pub/Sub, Cloud Run
 Jobs `revenueflow-api-migrate` e `revenueflow-opportunity-scan`) via
@@ -86,13 +85,15 @@ O código de aplicação **existe** e não é mais scaffolding.
 
 Fluxo que roda: `POST /webhook/whatsapp` (HMAC) → Pub/Sub `message_received` → `process_event`
 idempotente → sessão + lead provisório → grafo LangGraph `classify_intent → supervisor →
-recommendation → {respond | negotiation → [await_approval → apply_decision] → [checkout]}`
+{handoff | recommendation → {respond | negotiation → [await_approval → apply_decision] → [checkout]}}`
 (checkpointer PostgreSQL) → resposta ancorada / proposta de desconto / "encaminhado para
-aprovação" / proposta versionada + "sim, pode fechar" / pedido + pagamento sandbox / handoff em
-falha de LLM → `ChannelOutbound.send`. A retomada da aprovação chega por
+aprovação" / proposta versionada + "sim, pode fechar" / pedido + pagamento sandbox / transferência
+para atendente humano (pedido explícito, baixa confiança, alto valor ou falha de LLM) →
+`ChannelOutbound.send`. A retomada da aprovação chega por
 `POST /internal/approvals/{id}` → evento `approval_decided` → consumer com advisory lock. O gate
 de checkout: `supervisor` lê `get_open_quote`; enquanto há `Quote(SENT)`, o turno é do
-`checkout_node`.
+`checkout_node`. O `supervisor` também transfere (`handoff`) em pedido explícito ou baixa
+confiança quando **não** há quote aberto; sessão em `HUMAN_HANDOFF` não roda o grafo.
 
 Mapa de `src/revenueflow/`:
 
