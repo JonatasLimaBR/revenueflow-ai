@@ -20,7 +20,7 @@ from revenueflow.agents.recommendation import recommendation_node
 from revenueflow.agents.state import TurnState
 from revenueflow.config import get_settings
 from revenueflow.domain.errors import LLMError
-from revenueflow.domain.models import Intent
+from revenueflow.domain.models import HandoffReason, Intent
 from revenueflow.observability import get_tracer
 from revenueflow.policies.handoff_policy import should_handoff
 from revenueflow.repositories import checkout as checkout_repo
@@ -47,26 +47,38 @@ async def classify_intent_node(state: TurnState) -> dict[str, Any]:
             intent, confidence = await classify(state["customer_text"])
         except LLMError:
             return to_handoff("intent")
-    settings = get_settings()
-    reason = should_handoff(
-        intent=intent.value,
-        confidence=confidence,
-        resolved_total=None,
-        min_confidence=settings.handoff_min_confidence,
-        high_value_threshold=settings.handoff_high_value_threshold,
-    )
-    if reason is not None:
-        return to_handoff(reason.value)
     return {"intent": intent.value, "confidence": confidence}
 
 
 async def supervisor_node(state: TurnState) -> dict[str, Any]:
-    """Record the routing decision and surface any open quote for the conversation."""
+    """Surface any open quote, then hand off on an explicit request or low confidence.
+
+    The handoff check runs here (not in ``classify_intent``) so an open checkout
+    quote always keeps the turn: a terse confirmation like "sim, pode fechar"
+    would otherwise classify with low confidence and be transferred instead of
+    completing the order.
+    """
 
     async with unit_of_work() as conn:
         open_quote = await checkout_repo.get_open_quote(conn, state["conversation_id"])
     get_tracer().event("supervisor.route", attrs={"intent": state["intent"]})
-    return {"open_quote_id": open_quote.quote_id if open_quote is not None else None}
+    patch: dict[str, Any] = {
+        "open_quote_id": open_quote.quote_id if open_quote is not None else None
+    }
+    if state["intent"] == Intent.HUMAN_SUPPORT.value:
+        return {**patch, **to_handoff(HandoffReason.EXPLICIT_REQUEST.value)}
+    if open_quote is None:
+        settings = get_settings()
+        reason = should_handoff(
+            intent=state["intent"],
+            confidence=state.get("confidence", 1.0),
+            resolved_total=None,
+            min_confidence=settings.handoff_min_confidence,
+            high_value_threshold=settings.handoff_high_value_threshold,
+        )
+        if reason is not None:
+            return {**patch, **to_handoff(reason.value)}
+    return patch
 
 
 def route_after_classify(state: TurnState) -> str:
@@ -76,9 +88,9 @@ def route_after_classify(state: TurnState) -> str:
 
 
 def route_from_supervisor(state: TurnState) -> str:
-    """Explicit human request -> handoff; open quote -> gate; agent intents -> path."""
+    """Handoff patch -> handoff; open quote -> gate; agent intents -> path."""
 
-    if state["intent"] == Intent.HUMAN_SUPPORT.value:
+    if state.get("handoff"):
         return "handoff"
     if state.get("open_quote_id"):
         return "checkout"
