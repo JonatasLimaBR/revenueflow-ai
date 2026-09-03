@@ -37,6 +37,8 @@ class Settings(BaseSettings):
     handoff_min_confidence: float = 0.55
     handoff_high_value_threshold: Decimal = Decimal("50000")
 
+    audit_enabled: bool = True
+
     langfuse_host: str = ""
     langfuse_public_key: str = ""
     langfuse_secret_key: str = ""

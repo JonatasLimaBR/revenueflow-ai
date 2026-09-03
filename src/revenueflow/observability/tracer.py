@@ -9,10 +9,12 @@ inside ``__init__`` so importing this module never requires the optional
 from __future__ import annotations
 
 import logging
+import time
 from collections.abc import Iterator, Mapping
 from contextlib import AbstractContextManager, contextmanager
 from contextvars import ContextVar, Token
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import Any, Protocol, runtime_checkable
 from uuid import uuid4
 
@@ -73,6 +75,8 @@ class Tracer(Protocol):
 
     def end(self, *, outcome: str, policy_decision: str = "n/a", handoff: bool = False) -> None: ...
 
+    async def flush(self) -> None: ...
+
 
 class _NoopSpan:
     def end(self) -> None:
@@ -118,6 +122,9 @@ class NoopTracer:
         return None
 
     def end(self, *, outcome: str, policy_decision: str = "n/a", handoff: bool = False) -> None:
+        return None
+
+    async def flush(self) -> None:
         return None
 
 
@@ -267,6 +274,9 @@ class LangfuseTracer:
         except Exception:
             _LOGGER.warning("langfuse trace end failed", exc_info=True)
 
+    async def flush(self) -> None:
+        return None
+
 
 class _OTelSpan:
     def __init__(self, raw: Any) -> None:
@@ -385,8 +395,156 @@ class OTelTracer:
         except Exception:
             _LOGGER.warning("otel trace end failed", exc_info=True)
 
+    async def flush(self) -> None:
+        return None
 
-def new_tracer(*, conversation_id: str, turn_id: str) -> Tracer:
+
+class _BufferedSpan:
+    def __init__(self, entry: dict[str, Any], inner: Span, started: float) -> None:
+        self._entry = entry
+        self._inner = inner
+        self._started = started
+
+    def end(self) -> None:
+        self._entry.setdefault("ms", round((time.perf_counter() - self._started) * 1000, 2))
+        self._inner.end()
+
+
+class _BufferedGeneration:
+    def __init__(self, entry: dict[str, Any], inner: Generation, started: float) -> None:
+        self._entry = entry
+        self._inner = inner
+        self._started = started
+
+    def update(
+        self,
+        *,
+        output: Any = None,
+        usage: Usage | None = None,
+        cost_usd: float | None = None,
+    ) -> None:
+        if usage is not None:
+            self._entry["input_tokens"] = usage.input_tokens
+            self._entry["output_tokens"] = usage.output_tokens
+        if cost_usd is not None:
+            self._entry["cost_usd"] = cost_usd
+        self._inner.update(output=output, usage=usage, cost_usd=cost_usd)
+
+    def end(self) -> None:
+        self._entry.setdefault("ms", round((time.perf_counter() - self._started) * 1000, 2))
+        self._inner.end()
+
+
+class AuditTracer:
+    """Wraps the configured sink and persists one ``audit_event`` per turn."""
+
+    def __init__(self, primary: Tracer, *, conversation_id: str, turn_id: str) -> None:
+        self._primary = primary
+        self.trace_id = primary.trace_id
+        self._conversation_id = conversation_id
+        self._turn_id = turn_id
+        self._started = time.perf_counter()
+        self._events: list[dict[str, Any]] = []
+        self._agent: str | None = None
+        self._model: str | None = None
+        self._prompt_version: str | None = None
+        self._outcome = "unknown"
+        self._policy_decision = "n/a"
+        self._handoff = False
+        self._latency_ms: int | None = None
+        self._flushed = False
+
+    @contextmanager
+    def span(self, name: str, *, attrs: Mapping[str, Any] | None = None) -> Iterator[Span]:
+        entry: dict[str, Any] = {"kind": "span", "name": name}
+        if attrs:
+            entry["attrs"] = _masked_mapping(attrs)
+        self._events.append(entry)
+        if name.startswith("node."):
+            self._agent = name[len("node.") :]
+        with self._primary.span(name, attrs=attrs) as inner:
+            yield _BufferedSpan(entry, inner, time.perf_counter())
+
+    @contextmanager
+    def generation(
+        self,
+        name: str,
+        *,
+        model: str,
+        prompt_version: str,
+        input: Any = None,
+    ) -> Iterator[Generation]:
+        entry: dict[str, Any] = {
+            "kind": "generation",
+            "name": name,
+            "model": model,
+            "prompt_version": prompt_version,
+        }
+        self._events.append(entry)
+        self._model = model
+        self._prompt_version = prompt_version
+        with self._primary.generation(
+            name, model=model, prompt_version=prompt_version, input=input
+        ) as inner:
+            yield _BufferedGeneration(entry, inner, time.perf_counter())
+
+    def event(self, name: str, *, attrs: Mapping[str, Any] | None = None) -> None:
+        entry: dict[str, Any] = {"kind": "event", "name": name}
+        if attrs:
+            entry["attrs"] = _masked_mapping(attrs)
+        self._events.append(entry)
+        self._primary.event(name, attrs=attrs)
+
+    def end(self, *, outcome: str, policy_decision: str = "n/a", handoff: bool = False) -> None:
+        self._outcome = outcome
+        self._policy_decision = policy_decision
+        self._handoff = handoff
+        self._latency_ms = round((time.perf_counter() - self._started) * 1000)
+        self._primary.end(outcome=outcome, policy_decision=policy_decision, handoff=handoff)
+
+    async def flush(self) -> None:
+        if self._flushed:
+            return
+        self._flushed = True
+        from revenueflow.domain.models import AuditEvent
+        from revenueflow.services.audit import persist
+
+        tokens = sum(
+            int(entry.get("input_tokens", 0)) + int(entry.get("output_tokens", 0))
+            for entry in self._events
+            if entry["kind"] == "generation"
+        )
+        cost = sum(
+            (Decimal(str(entry["cost_usd"])) for entry in self._events if "cost_usd" in entry),
+            Decimal("0"),
+        )
+        tools = [
+            str(entry["name"])
+            for entry in self._events
+            if entry["kind"] == "span" and str(entry["name"]).startswith("tool.")
+        ]
+        await persist(
+            AuditEvent(
+                audit_id=self._turn_id,
+                trace_id=self.trace_id,
+                conversation_id=self._conversation_id,
+                turn_id=self._turn_id,
+                agent=self._agent,
+                model=self._model,
+                prompt_version=self._prompt_version,
+                outcome=self._outcome,
+                policy_decision=self._policy_decision,
+                handoff=self._handoff,
+                tools=tools,
+                token_usage=tokens,
+                cost_usd=cost,
+                latency_ms=self._latency_ms,
+                events=self._events,
+            )
+        )
+
+
+def _build_primary(*, conversation_id: str, turn_id: str) -> Tracer:
     sink = get_settings().tracer_sink
     if sink == "langfuse":
         try:
@@ -401,6 +559,13 @@ def new_tracer(*, conversation_id: str, turn_id: str) -> Tracer:
             _LOGGER.warning("otel tracer unavailable; using noop", exc_info=True)
             return NoopTracer(turn_id=turn_id)
     return NoopTracer(turn_id=turn_id)
+
+
+def new_tracer(*, conversation_id: str, turn_id: str) -> Tracer:
+    primary = _build_primary(conversation_id=conversation_id, turn_id=turn_id)
+    if get_settings().audit_enabled:
+        return AuditTracer(primary, conversation_id=conversation_id, turn_id=turn_id)
+    return primary
 
 
 _DEFAULT: Tracer = NoopTracer()

@@ -18,6 +18,7 @@ from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from revenueflow.agents import build_graph
 from revenueflow.api import (
     approvals_router,
+    audit_router,
     handoffs_router,
     health_router,
     webhook_router,
@@ -54,3 +55,4 @@ app.include_router(webhook_router)
 app.include_router(health_router)
 app.include_router(approvals_router)
 app.include_router(handoffs_router)
+app.include_router(audit_router)

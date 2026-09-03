@@ -1,3 +1,6 @@
+import pytest
+
+from revenueflow.config import get_settings
 from revenueflow.observability import (
     NoopTracer,
     Tracer,
@@ -7,6 +10,7 @@ from revenueflow.observability import (
     reset_tracer,
     set_tracer,
 )
+from revenueflow.observability.tracer import AuditTracer
 
 
 def test_noop_span_accepts_pii_attrs() -> None:
@@ -39,9 +43,21 @@ def test_noop_trace_id_uses_turn_id_when_given() -> None:
     assert tracer.trace_id == "turn-123"
 
 
-def test_new_tracer_defaults_to_noop() -> None:
+def test_new_tracer_wraps_in_audit_by_default() -> None:
     tracer = new_tracer(conversation_id="conv-1", turn_id="turn-1")
-    assert isinstance(tracer, NoopTracer)
+    assert isinstance(tracer, AuditTracer)
+    assert isinstance(tracer._primary, NoopTracer)
+    assert tracer.trace_id == "turn-1"
+
+
+def test_audit_disabled_returns_primary(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AUDIT_ENABLED", "false")
+    get_settings.cache_clear()
+    try:
+        tracer = new_tracer(conversation_id="conv-1", turn_id="turn-1")
+        assert isinstance(tracer, NoopTracer)
+    finally:
+        get_settings.cache_clear()
 
 
 def test_get_set_reset_tracer() -> None:

@@ -83,4 +83,5 @@ async def scan(*, now: datetime | None = None) -> ScanResult:
         get_tracer().end(outcome="scanned")
         return result
     finally:
+        await get_tracer().flush()
         reset_tracer(token)
