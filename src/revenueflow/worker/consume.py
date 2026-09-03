@@ -12,12 +12,14 @@ ack / nack decision, so this function must not swallow failures.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
 from langgraph.types import Command
 
 from revenueflow.adapters import ChannelOutbound, get_outbound
+from revenueflow.config import get_settings
 from revenueflow.domain.models import Intent, SessionStatus
 from revenueflow.events import EventEnvelope
 from revenueflow.observability import get_tracer, new_tracer, reset_tracer, set_tracer
@@ -31,6 +33,11 @@ _HELD_FOR_APPROVAL = (
 )
 
 _HELD_FOR_HANDOFF = "Sua conversa esta com um atendente humano; ele responde em breve."
+
+_SLOW_REPLY = (
+    "Estamos com um volume alto agora e sua mensagem esta demorando mais que o normal. "
+    "Ja retorno com a resposta."
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -66,6 +73,22 @@ async def _send_once(
         reserved = await dispatch.reserve(conn, dispatch_key=dispatch_key)
     if reserved:
         await (outbound or get_outbound()).send(phone=phone, text=text, dispatch_key=dispatch_key)
+
+
+async def _reply_timeout(
+    conversation_id: str,
+    event_id: str,
+    phone: str | None,
+    outbound: ChannelOutbound | None,
+) -> None:
+    """Send the fixed slowness reply and end the trace with ``outcome="timeout"``."""
+
+    if phone is not None:
+        await _send_once(conversation_id, event_id, phone, _SLOW_REPLY, outbound)
+    try:
+        get_tracer().end(outcome="timeout")
+    except Exception:
+        _LOGGER.debug("tracer end after timeout also failed", exc_info=True)
 
 
 async def process_event(
@@ -114,7 +137,10 @@ async def process_event(
             "lead_id": lead_id,
             "turn_id": envelope.event_id,
         }
-        result = await get_graph().ainvoke(state_in, config=config)
+        result = await asyncio.wait_for(
+            get_graph().ainvoke(state_in, config=config),
+            timeout=get_settings().turn_budget_s,
+        )
         reply = str(result["reply"])
         await record_turn(
             session.conversation_id,
@@ -123,6 +149,10 @@ async def process_event(
         )
         await _send_once(session.conversation_id, envelope.event_id, phone, reply, outbound)
         get_tracer().end(outcome=str(result.get("final_outcome", "replied")))
+        return True
+    except TimeoutError:
+        _LOGGER.warning("turn budget exceeded for %s", envelope.event_id)
+        await _reply_timeout(session.conversation_id, envelope.event_id, phone, outbound)
         return True
     except Exception:
         _LOGGER.exception("process_event failed for %s", envelope.event_id)
@@ -155,14 +185,17 @@ async def process_approval_decided(
     try:
         async with unit_of_work() as conn:
             await execute(conn, "SELECT pg_advisory_xact_lock(hashtext(%s))", (conversation_id,))
-            result = await get_graph().ainvoke(
-                Command(
-                    resume={
-                        "decision": envelope.payload["decision"],
-                        "discount_pct": envelope.payload.get("discount_pct"),
-                    }
+            result = await asyncio.wait_for(
+                get_graph().ainvoke(
+                    Command(
+                        resume={
+                            "decision": envelope.payload["decision"],
+                            "discount_pct": envelope.payload.get("discount_pct"),
+                        }
+                    ),
+                    config={"configurable": {"thread_id": conversation_id}},
                 ),
-                config={"configurable": {"thread_id": conversation_id}},
+                timeout=get_settings().turn_budget_s,
             )
 
         reply = str(result["reply"])
@@ -179,6 +212,12 @@ async def process_approval_decided(
             await _send_once(conversation_id, envelope.event_id, phone, reply, outbound)
 
         get_tracer().end(outcome=str(result.get("final_outcome", "resumed")))
+        return True
+    except TimeoutError:
+        _LOGGER.warning("resume turn budget exceeded for %s", envelope.event_id)
+        async with unit_of_work() as conn:
+            phone = await session_repo.phone_for(conn, conversation_id)
+        await _reply_timeout(conversation_id, envelope.event_id, phone, outbound)
         return True
     except Exception:
         _LOGGER.exception("process_approval_decided failed for %s", envelope.event_id)

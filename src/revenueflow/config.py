@@ -39,6 +39,10 @@ class Settings(BaseSettings):
 
     audit_enabled: bool = True
 
+    llm_call_timeout_s: float = 6.0
+    db_statement_timeout_ms: int = 3000
+    turn_budget_s: float = 15.0
+
     log_level: str = "INFO"
     otel_service_name: str = "revenueflow-api"
 

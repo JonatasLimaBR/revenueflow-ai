@@ -86,10 +86,7 @@ Fatias entregues, arquivadas em `.claude/sdd/archive/`:
   `_send_once` (fora do P95). `0009` cria `audit_event` + views `v_ai_cost_per_conversation` /
   `v_ai_cost_per_outcome`. Rota `GET /internal/audit/{conversation_id}` (Bearer reusa
   `HANDOFF_API_TOKEN`). Sem infra nova.
-
-Em revisão:
-
-- **OBSERVABILITY_OPS** (2026-09-03, ADR-056) — fecha a SPEC-034. `AuditTracer.flush()` passa a
+- **OBSERVABILITY_OPS** (2026-09-03, PR #45, ADR-056) — fecha a SPEC-034. `AuditTracer.flush()` passa a
   emitir **uma** linha JSON `audit.turn` por turno (`conversation_id`/`outcome`/`agent`/`model`/
   `cost_usd`/`token_usage`/`latency_ms`/`handoff`/`tool_failures`) ao lado do `persist` —
   `observability/logging_setup.py` traz um `JsonFormatter` stdlib (sem dep) + `configure_logging()`
@@ -105,11 +102,24 @@ Em revisão:
   `cloudtrace`/`logging`/`monitoring`; `iam.tf` += `roles/cloudtrace.agent`; `Dockerfile` instala
   `.[events,llm,observability]`.
 
+Em revisão:
+
+- **HARDENING_PERFORMANCE** (2026-09-03, ADR-057) — fecha a SPEC-035: impõe um orçamento de
+  latência. `asyncio.wait_for` em 3 lugares — cada tentativa da chamada Vertex em
+  `_generate_with_retry` (`llm_call_timeout_s=6`; `TimeoutError` é transitório → retry → exaustão
+  → `LLMError` → handoff), o `graph.ainvoke` nos 2 consumidores (`turn_budget_s=15` — teto de
+  turno **preso**; `except TimeoutError` → `_SLOW_REPLY` fixo + `end(outcome="timeout")` + ack,
+  porque o `processed_event.claim` já foi committado), e `statement_timeout=3000ms` no
+  `AsyncConnectionPool` da app (via `kwargs={"options": ...}`). O alvo de P95<5s continua
+  **medido** (métrica/alerta da OBSERVABILITY_OPS), não imposto. `0011` cria 4 índices
+  (`opportunity`/`handoff`/`approval` por `(status, created_at)`, `quote (customer_ref) WHERE
+  status='SENT'`). Sem dep nova, sem infra nova.
+
 Deploy: o ambiente GCP está no ar (Cloud Run `revenueflow-api`, Cloud SQL, Pub/Sub, Cloud Run
 Jobs `revenueflow-api-migrate` e `revenueflow-opportunity-scan`) via
 `.github/workflows/terraform.yml` (ADR-048); schema + catálogo simulado aplicados. Pendências
 operacionais: valores reais dos secrets do WhatsApp, registro do webhook no Meta,
-`gcloud run jobs execute revenueflow-api-migrate` para aplicar `0005`–`0010`, e preencher
+`gcloud run jobs execute revenueflow-api-migrate` para aplicar `0005`–`0011`, e preencher
 `alert_email` no tfvars para os alertas do Cloud Monitoring notificarem.
 
 O código de aplicação **existe** e não é mais scaffolding.
@@ -130,7 +140,7 @@ Mapa de `src/revenueflow/`:
 
 | Pacote | Papel |
 |---|---|
-| `config` | `Settings` tipado (pydantic-settings) + flags `CHANNEL_OUTBOUND`/`TRACER_SINK`/`LLM_STUB`; `google_cloud_project`/`vertex_location`/`llm_max_retries`; `log_level`/`otel_service_name` |
+| `config` | `Settings` tipado (pydantic-settings) + flags `CHANNEL_OUTBOUND`/`TRACER_SINK`/`LLM_STUB`; `google_cloud_project`/`vertex_location`/`llm_max_retries`; `log_level`/`otel_service_name`; `llm_call_timeout_s`/`db_statement_timeout_ms`/`turn_budget_s` |
 | `domain` | erros tipados; enums `SessionStatus` (+`HUMAN_HANDOFF`)/`LeadStatus`/`Intent`/`ApprovalStatus`/`QuoteStatus`/`OrderStatus`/`PaymentStatus`/`OpportunityType`/`OpportunityStatus`/`HandoffReason`/`HandoffStatus`; dataclasses de entidade (`Quote`/`Order`/`Payment`/`Customer`/`Opportunity`/`Handoff` incl.) |
 | `observability` | `mask()` de PII; porta `Tracer` (`noop`/`langfuse`/`otel` + `AuditTracer` que envolve o sink, grava `audit_event` e emite a linha `audit.turn` por turno via `flush()`); `cost_usd()` (`MODEL_PRICES` do Vertex); `logging_setup` (`JsonFormatter` stdlib + `configure_logging`); `otel_setup` (`configure_otel` — `TracerProvider` + Cloud Trace exporter, ADR-056) |
 | `events` | `EventEnvelope`; porta `EventPublisher` (`in_memory`/`pubsub`) |
@@ -387,3 +397,4 @@ Claude deve localizar e ler os documentos relacionados antes de implementar.
 - [ADR-054 — Human Handoff: gatilhos determinísticos + entidade + contexto estruturado](docs/adrs/adr-054-human-handoff-deterministic-triggers-and-context.md)
 - [ADR-055 — Audit Trail: AuditTracer envolve o sink + uma linha por turno via flush()](docs/adrs/adr-055-audit-trail-tracer-sink-wrapper.md)
 - [ADR-056 — OBSERVABILITY_OPS: OTel → Cloud Trace de produção + métricas via log-based metrics](docs/adrs/adr-056-observability-ops-otel-cloud-trace-and-log-metrics.md)
+- [ADR-057 — Orçamento de latência: timeout por dependência + teto duro no turno](docs/adrs/adr-057-latency-budget-per-dependency-timeout-and-turn-cap.md)

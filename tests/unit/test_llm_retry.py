@@ -1,7 +1,9 @@
+import asyncio
 from typing import Any
 
 import pytest
 
+from revenueflow.config import get_settings
 from revenueflow.domain.errors import LLMError
 from revenueflow.services import llm
 
@@ -69,3 +71,37 @@ async def test_rate_limit_is_retried() -> None:
 
     assert await llm._generate_with_retry(call) == "ok"
     assert calls["n"] == 2
+
+
+@pytest.fixture
+def _fast_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("LLM_CALL_TIMEOUT_S", "0.05")
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
+
+
+async def test_slow_call_times_out_every_attempt_then_raises(_fast_timeout: None) -> None:
+    calls = {"n": 0}
+
+    async def call(_client: Any) -> str:
+        calls["n"] += 1
+        await asyncio.Event().wait()
+        return "never"
+
+    with pytest.raises(LLMError):
+        await llm._generate_with_retry(call)
+    assert calls["n"] == get_settings().llm_max_retries + 1
+
+
+async def test_slow_call_that_recovers_returns(_fast_timeout: None) -> None:
+    calls = {"n": 0}
+
+    async def call(_client: Any) -> str:
+        calls["n"] += 1
+        if calls["n"] < 3:
+            await asyncio.Event().wait()
+        return "ok"
+
+    assert await llm._generate_with_retry(call) == "ok"
+    assert calls["n"] == 3

@@ -163,12 +163,14 @@ def _is_transient(exc: BaseException) -> bool:
 async def _generate_with_retry(call: Callable[[Any], Awaitable[Any]]) -> Any:
     """Run ``call`` against a fresh Vertex client, retrying only transient errors."""
 
-    retries = get_settings().llm_max_retries
+    settings = get_settings()
+    retries = settings.llm_max_retries
+    timeout_s = settings.llm_call_timeout_s
     client = _vertex_client()
     last: BaseException | None = None
     for attempt in range(retries + 1):
         try:
-            return await call(client)
+            return await asyncio.wait_for(call(client), timeout=timeout_s)
         except Exception as exc:
             if not _is_transient(exc):
                 raise LLMError("gemini call failed (non-retryable)") from exc
