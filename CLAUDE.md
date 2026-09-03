@@ -51,10 +51,7 @@ Fatias entregues, arquivadas em `.claude/sdd/archive/`:
   `get_customer_360` **só** em `RECOMMENDATION_TOOLS` (ADR-033); `recommendation_node` a chama no
   ramo `if customer_id:` (substitui `get_customer_sales_context`); falha →
   `{"error": "unavailable"}` + log com `trace_id`. `0006` cria `customer` + `sim_customer_order`.
-
-Em revisão:
-
-- **OPPORTUNITY_ENGINE** (2026-09-03, ADR-053) — detecção de oportunidade por **regra
+- **OPPORTUNITY_ENGINE** (2026-09-03, PR #39, ADR-053) — detecção de oportunidade por **regra
   determinística**, em batch, **fora do grafo** (ADR-019). `services.opportunity.scan()` puxa
   candidatos (recompra atrasada: `days_since_last_purchase > average_purchase_interval * threshold`;
   quote parada: `SENT` sem `sales_order` além do limite), roda `policies.opportunity_policy`
