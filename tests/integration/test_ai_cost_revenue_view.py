@@ -1,3 +1,4 @@
+from decimal import Decimal
 from uuid import uuid4
 
 from revenueflow.repositories.db import execute, fetchall, unit_of_work
@@ -46,12 +47,12 @@ async def test_view_pairs_ai_cost_with_paid_revenue(db: None) -> None:
         )
 
     by_id = {r["conversation_id"]: r for r in rows}
-    assert by_id[conv_a]["ai_cost_usd"] == 0.006
-    assert by_id[conv_a]["revenue"] == 1500
+    assert by_id[conv_a]["ai_cost_usd"] == Decimal("0.006")
+    assert by_id[conv_a]["revenue"] == Decimal("1500")
     assert by_id[conv_a]["orders"] == 1
     assert by_id[conv_a]["turns"] == 3
 
-    assert by_id[conv_b]["ai_cost_usd"] == 0.002
+    assert by_id[conv_b]["ai_cost_usd"] == Decimal("0.002")
     assert by_id[conv_b]["revenue"] == 0
     assert by_id[conv_b]["orders"] == 0
     assert by_id[conv_b]["turns"] == 2
