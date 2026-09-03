@@ -39,6 +39,9 @@ class Settings(BaseSettings):
 
     audit_enabled: bool = True
 
+    log_level: str = "INFO"
+    otel_service_name: str = "revenueflow-api"
+
     langfuse_host: str = ""
     langfuse_public_key: str = ""
     langfuse_secret_key: str = ""

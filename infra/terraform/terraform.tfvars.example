@@ -3,7 +3,18 @@ region        = "southamerica-east1"
 image         = "southamerica-east1-docker.pkg.dev/revenueflow-ai-prod/revenueflow/api:REPLACE_WITH_SHA"
 min_instances = 1
 max_instances = 4
-tracer_sink   = "noop"
+tracer_sink   = "otel"
+
+# Cloud Monitoring email channel for the alert policies (ADR-056). Empty = the
+# alerts still exist but do not notify anyone.
+# alert_email = "oncall@example.com"
+
+# Optional alert thresholds (defaults shown).
+# alert_5xx_ratio              = 0.02
+# alert_p95_latency_ms         = 3000
+# alert_tool_failures_per_hour = 10
+# alert_ai_cost_per_hour_usd   = 1.0
+# alert_no_turns_minutes       = 15
 
 # Optional: set to enable the budget alert.
 # billing_account   = "XXXXXX-XXXXXX-XXXXXX"

@@ -12,6 +12,9 @@ locals {
     "compute.googleapis.com",
     "billingbudgets.googleapis.com",
     "aiplatform.googleapis.com",
+    "cloudtrace.googleapis.com",
+    "logging.googleapis.com",
+    "monitoring.googleapis.com",
   ])
 }
 

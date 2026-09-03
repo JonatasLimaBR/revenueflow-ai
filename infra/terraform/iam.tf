@@ -19,3 +19,11 @@ resource "google_project_iam_member" "api_vertex_user" {
   role    = "roles/aiplatform.user"
   member  = "serviceAccount:${google_service_account.api.email}"
 }
+
+# Cloud Trace span export for TRACER_SINK=otel (ADR-056). `agent`, the minimal
+# role that lets a workload write spans (ADR-008: least privilege).
+resource "google_project_iam_member" "api_cloudtrace_agent" {
+  project = var.project_id
+  role    = "roles/cloudtrace.agent"
+  member  = "serviceAccount:${google_service_account.api.email}"
+}

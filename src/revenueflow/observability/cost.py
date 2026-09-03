@@ -1,7 +1,10 @@
 """Token-cost estimation for model generations.
 
-The per-model rates in :data:`MODEL_PRICES` are placeholders pending
-confirmation of official Vertex AI Gemini pricing through the ``gcp-cli`` MCP.
+:data:`MODEL_PRICES` holds USD per 1M tokens (input, output) from the published
+Vertex AI Gemini pricing (cloud.google.com/vertex-ai/generative-ai/pricing),
+consulted 2026-09-03. Values for the tiered models (2.5-pro, 1.5-*) are the
+standard-context tier (<=200k / <=128k prompt). Re-check when Google revises the
+table; the AI-cost KPI (ADR-023) is only as accurate as these rates.
 """
 
 from __future__ import annotations
@@ -10,8 +13,10 @@ from revenueflow.observability.tracer import Usage
 
 MODEL_PRICES: dict[str, tuple[float, float]] = {
     "gemini-2.5-flash": (0.30, 2.50),
+    "gemini-2.5-flash-lite": (0.10, 0.40),
     "gemini-2.5-pro": (1.25, 10.00),
     "gemini-2.0-flash": (0.10, 0.40),
+    "gemini-2.0-flash-lite": (0.075, 0.30),
     "gemini-1.5-flash": (0.075, 0.30),
     "gemini-1.5-pro": (1.25, 5.00),
 }
