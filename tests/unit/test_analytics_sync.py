@@ -69,7 +69,20 @@ def bq(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     fake_module.LoadJobConfig = _FakeLoadJobConfig  # type: ignore[attr-defined]
     fake_module.WriteDisposition = _FakeWriteDisposition  # type: ignore[attr-defined]
     fake_module.SchemaField = _FakeSchemaField  # type: ignore[attr-defined]
+
+    google_mod = sys.modules.get("google")
+    if google_mod is None:
+        google_mod = types.ModuleType("google")
+        monkeypatch.setitem(sys.modules, "google", google_mod)
+
+    cloud_mod = sys.modules.get("google.cloud")
+    if cloud_mod is None:
+        cloud_mod = types.ModuleType("google.cloud")
+        monkeypatch.setitem(sys.modules, "google.cloud", cloud_mod)
+    monkeypatch.setattr(google_mod, "cloud", cloud_mod, raising=False)
+
     monkeypatch.setitem(sys.modules, "google.cloud.bigquery", fake_module)
+    monkeypatch.setattr(cloud_mod, "bigquery", fake_module, raising=False)
     return state
 
 
