@@ -31,3 +31,18 @@ output "artifact_registry_repo" {
   description = "docker push target prefix"
   value       = "${var.region}-docker.pkg.dev/${var.project_id}/revenueflow"
 }
+
+output "landing_page_ip" {
+  description = "Static IP for the landing page (no domain yet: http://<this>/)"
+  value       = google_compute_global_address.landing.address
+}
+
+output "landing_page_bucket" {
+  description = "GCS bucket name for `gsutil rsync` in CD"
+  value       = google_storage_bucket.landing.name
+}
+
+output "landing_page_url_map" {
+  description = "URL map name for `gcloud compute url-maps invalidate-cdn-cache` in CD"
+  value       = google_compute_url_map.landing.name
+}

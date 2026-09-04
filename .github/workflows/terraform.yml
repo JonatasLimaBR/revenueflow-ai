@@ -5,11 +5,13 @@ on:
     paths:
       - "infra/terraform/**"
       - ".github/workflows/terraform.yml"
+      - "site/**"
   push:
     branches: [main]
     paths:
       - "infra/terraform/**"
       - ".github/workflows/terraform.yml"
+      - "site/**"
       # The deploy job builds and pushes the image, so image inputs must redeploy.
       - "Dockerfile"
       - "pyproject.toml"
@@ -120,3 +122,11 @@ jobs:
             -var "project_id=${{ vars.GCP_PROJECT_ID }}" \
             -var "region=${{ vars.GCP_REGION }}" \
             -var "image=${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/revenueflow/api:${{ github.sha }}"
+
+      - name: publish landing page
+        working-directory: ${{ env.WORKDIR }}
+        run: |
+          bucket=$(terraform output -raw landing_page_bucket)
+          url_map=$(terraform output -raw landing_page_url_map)
+          gsutil -m rsync -r -d "${{ github.workspace }}/site" "gs://${bucket}"
+          gcloud compute url-maps invalidate-cdn-cache "$url_map" --path "/*" --async

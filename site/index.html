@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; frame-ancestors 'none'">
+  <meta name="description"
+        content="RevenueFlow AI — agente comercial B2B via WhatsApp sobre GCP e Vertex AI. LLM interpreta, um Policy Engine determinístico decide, a API executa. 13 fatias entregues, do webhook ao contato ativo.">
+  <title>RevenueFlow AI</title>
+  <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#produto">Pular para o conteúdo</a>
+
+  <nav class="topnav" aria-label="Navegação principal">
+    <a class="topnav__brand" href="#produto"><span class="dot" aria-hidden="true"></span>RevenueFlow AI</a>
+    <ul class="topnav__links">
+      <li><a href="#produto">Produto</a></li>
+      <li><a href="#fases">Como funciona</a></li>
+      <li><a href="#arquitetura">Arquitetura</a></li>
+      <li><a href="#roadmap">Roadmap</a></li>
+    </ul>
+    <a class="topnav__cta" href="https://github.com/JonatasLimaBR/revenueflow-ai" target="_blank" rel="noopener">Ver no GitHub</a>
+  </nav>
+
+  <header id="produto" class="hero">
+    <div class="container hero__inner">
+      <span class="eyebrow">Agente comercial B2B · WhatsApp · Google Cloud</span>
+      <h1>Um agente de vendas que nunca decide preço, estoque ou pagamento sozinho.</h1>
+      <p class="lead">
+        RevenueFlow AI atende, negocia, fecha pedido e reabre conversa por iniciativa própria via
+        WhatsApp — tudo sobre Cloud Run, Cloud SQL, Pub/Sub e Vertex AI/Gemini. O LLM interpreta a
+        mensagem; um Policy Engine determinístico decide o que é permitido; a API executa. Nada
+        disso é uma frase de efeito — é a arquitetura, e este site mostra exatamente como.
+      </p>
+      <div class="hero__ctas">
+        <a class="btn btn--primary" href="https://github.com/JonatasLimaBR/revenueflow-ai" target="_blank" rel="noopener">Explorar o código</a>
+        <a class="btn btn--ghost" href="#fases">Ver as 13 fatias entregues</a>
+      </div>
+      <div class="stats">
+        <div class="stat">
+          <span class="stat__value">13</span>
+          <span class="stat__label">fatias entregues</span>
+        </div>
+        <div class="stat">
+          <span class="stat__value">60</span>
+          <span class="stat__label">ADRs documentados</span>
+        </div>
+        <div class="stat">
+          <span class="stat__value">0</span>
+          <span class="stat__label">pagamento real (sandbox só)</span>
+        </div>
+        <div class="stat">
+          <span class="stat__value">100%</span>
+          <span class="stat__label">decisão de preço fora do LLM</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <section id="fases" aria-labelledby="fases-title">
+    <div class="container">
+      <div class="section__head">
+        <span class="eyebrow">Do webhook ao contato ativo</span>
+        <h2 id="fases-title">Seis fases, treze fatias, uma jornada comercial completa</h2>
+        <p>
+          Cada fatia foi entregue com o ciclo completo do projeto — Brainstorm, Define, Design,
+          Build, Ship — e mergeada em <code>main</code> só depois de todos os checks do CI
+          verdes. Nenhuma delas é um protótipo: o código roda em produção no Cloud Run hoje.
+        </p>
+      </div>
+
+      <div class="phase-list">
+
+        <article class="phase">
+          <div class="phase__head">
+            <span class="phase__num" aria-hidden="true">1</span>
+            <div class="phase__title-group">
+              <h3>Atendimento &amp; IA</h3>
+              <p>A conversa entra pelo WhatsApp e chega a uma resposta ancorada em dado real — nunca em uma alucinação do modelo.</p>
+            </div>
+          </div>
+          <div class="slice-grid">
+            <div class="slice">
+              <span class="slice__name">WHATSAPP_INBOUND_SLICE</span>
+              <p><strong>Webhook autenticado por HMAC</strong> publica em Pub/Sub; um grafo LangGraph classifica a intenção e monta uma resposta ancorada em catálogo/preço/estoque reais, nunca em texto solto do modelo.</p>
+            </div>
+            <div class="slice">
+              <span class="slice__name">WHATSAPP_INBOUND_VERTEX</span>
+              <p>Os dois pontos que usam LLM — classificação de intenção e a resposta — passam a chamar <strong>Vertex AI Gemini</strong> de verdade (<code>gemini-2.5-flash</code>), keyless via ADC. Falha transitória vira retry; exaustão vira encaminhamento fixo para um humano, nunca uma resposta inventada.</p>
+            </div>
+          </div>
+        </article>
+
+        <article class="phase">
+          <div class="phase__head">
+            <span class="phase__num" aria-hidden="true">2</span>
+            <div class="phase__title-group">
+              <h3>Negociação &amp; Aprovação</h3>
+              <p>O cliente pode pedir desconto. O LLM nunca decide se o desconto é aceitável — uma policy determinística decide, e o que passa da alçada pausa para um humano.</p>
+            </div>
+          </div>
+          <div class="slice-grid">
+            <div class="slice">
+              <span class="slice__name">PRICING_AND_NEGOTIATION</span>
+              <p>Um Pricing Service determinístico calcula margem e alçada; o Negotiation Agent só propõe o que a policy permite. Desconto fora da política <strong>pausa o próprio grafo</strong> (<code>interrupt()</code>) e cria uma <code>Approval(PENDING)</code> — fire-and-stop, sem meia-decisão.</p>
+            </div>
+            <div class="slice">
+              <span class="slice__name">APPROVAL_RESUME</span>
+              <p>Fecha o fire-and-stop: uma rota interna autenticada transiciona a aprovação e publica um evento; o consumidor toma um <em>advisory lock</em> por conversa e retoma o grafo exatamente de onde parou — aprovar, aprovar com outro valor, rejeitar ou expirar, cada caminho determinístico.</p>
+            </div>
+          </div>
+        </article>
+
+        <article class="phase">
+          <div class="phase__head">
+            <span class="phase__num" aria-hidden="true">3</span>
+            <div class="phase__title-group">
+              <h3>Pedido &amp; Pagamento</h3>
+              <p>Fechar negócio é sempre um passo determinístico e idempotente — nunca uma inferência do modelo sobre "o cliente quis dizer sim".</p>
+            </div>
+          </div>
+          <div class="slice-grid">
+            <div class="slice">
+              <span class="slice__name">CHECKOUT</span>
+              <p>Um pedido explícito gera uma <code>Quote</code> a partir do preço já resolvido e pede confirmação clara. Confirmar cria o pedido <strong>de forma idempotente</strong> (nunca duplica), revalida estoque na hora, e roda um pagamento em sandbox — zero dado de cartão, zero transação real.</p>
+            </div>
+          </div>
+        </article>
+
+        <article class="phase">
+          <div class="phase__head">
+            <span class="phase__num" aria-hidden="true">4</span>
+            <div class="phase__title-group">
+              <h3>Inteligência de Cliente</h3>
+              <p>Reconhecer quem já é cliente, e perceber sozinho quando vale a pena reabrir a conversa — sem esperar o cliente escrever primeiro.</p>
+            </div>
+          </div>
+          <div class="slice-grid">
+            <div class="slice">
+              <span class="slice__name">CUSTOMER_360</span>
+              <p>O telefone que escreve é conferido contra a base de clientes <strong>antes</strong> de virar um lead novo. Cliente conhecido ganha uma visão comercial de 365 dias — pedidos, ticket médio, produtos preferidos, propostas em aberto — sem que esse dado bruto vá inteiro para o LLM.</p>
+            </div>
+            <div class="slice">
+              <span class="slice__name">OPPORTUNITY_ENGINE</span>
+              <p>Um job em lote, <strong>fora da conversa e fora do grafo</strong>, varre recompra atrasada e proposta parada por regra pura — sem machine learning, sem achismo. Cada oportunidade detectada carrega o motivo e a evidência numérica exata que a gerou.</p>
+            </div>
+          </div>
+        </article>
+
+        <article class="phase">
+          <div class="phase__head">
+            <span class="phase__num" aria-hidden="true">5</span>
+            <div class="phase__title-group">
+              <h3>Governança &amp; Operação</h3>
+              <p>Tudo o que torna um agente de IA operável em produção de verdade: saber quando chamar um humano, provar o que aconteceu, medir custo e latência, e fechar as lacunas de segurança antes que alguém precise achá-las.</p>
+            </div>
+          </div>
+          <div class="slice-grid">
+            <div class="slice">
+              <span class="slice__name">HUMAN_HANDOFF</span>
+              <p>Três gatilhos determinísticos transferem a conversa para um humano — pedido explícito, baixa confiança da classificação, ou pedido de alto valor — cada um com precedência fixa, nunca uma decisão do LLM sobre "isso parece complicado".</p>
+            </div>
+            <div class="slice">
+              <span class="slice__name">AUDIT_TRAIL</span>
+              <p>Toda conversa grava <strong>uma linha de auditoria por turno</strong> no próprio banco — agente, modelo, ferramentas usadas, tokens, custo em dólar, latência e o resultado final — sem depender de um serviço externo de observabilidade para reconstruir o que aconteceu.</p>
+            </div>
+            <div class="slice">
+              <span class="slice__name">OBSERVABILITY_OPS</span>
+              <p>A mesma linha de auditoria vira log estruturado e métrica de produção: 5 alertas cobrindo erro 5xx, latência p95, falha de ferramenta, custo de IA por hora e ausência de tráfego — um dashboard, não uma promessa de monitoramento.</p>
+            </div>
+            <div class="slice">
+              <span class="slice__name">HARDENING_PERFORMANCE</span>
+              <p>Todo turno tem um orçamento de tempo real: timeout por tentativa na chamada ao Vertex AI, um teto duro no turno inteiro, e um limite de tempo por consulta no banco — para que "o modelo está lento" nunca vire "o cliente ficou sem resposta".</p>
+            </div>
+            <div class="slice">
+              <span class="slice__name">HARDENING_SECURITY_PII</span>
+              <p>Uma passada dedicada de segurança: CPF passa a ser mascarado em todo log, toda resposta HTTP ganha os headers mínimos de proteção, e uma suíte de testes <strong>prova</strong> — não afirma — que uma mensagem adversária não muda alçada, preço, nem pula uma aprovação.</p>
+            </div>
+          </div>
+        </article>
+
+        <article class="phase">
+          <div class="phase__head">
+            <span class="phase__num" aria-hidden="true">6</span>
+            <div class="phase__title-group">
+              <h3>Venda Ativa</h3>
+              <p>A oportunidade detectada finalmente vira contato — mas só depois de passar por um portão real de consentimento, não um checkbox de fachada.</p>
+            </div>
+          </div>
+          <div class="slice-grid">
+            <div class="slice">
+              <span class="slice__name">ACTIVE_SALES</span>
+              <p>Um job em lote consome as oportunidades abertas e roda um <strong>Policy Gate</strong> de verdade — opt-out sempre vence, sem consentimento explícito ninguém é contatado, e há um limite de frequência por cliente — antes de enviar uma mensagem template pelo WhatsApp. Responder "PARAR" encerra o contato na hora, sem passar pelo modelo.</p>
+            </div>
+          </div>
+        </article>
+
+      </div>
+    </div>
+  </section>
+
+  <section id="arquitetura" aria-labelledby="arquitetura-title">
+    <div class="container">
+      <div class="section__head">
+        <span class="eyebrow">Sob o capô</span>
+        <h2 id="arquitetura-title">LLM interpreta. Policy Engine decide. API executa.</h2>
+        <p>
+          Essa frase não é uma tagline — é a regra que todo código novo tem que respeitar antes de
+          entrar em <code>main</code>. Nenhuma fatia acima quebra essa ordem.
+        </p>
+      </div>
+
+      <div class="arch-flow" role="img" aria-label="Fluxo: webhook do WhatsApp autenticado por HMAC publica em Pub/Sub, que aciona um consumidor idempotente, que roda o grafo LangGraph, cujo resultado é enviado de volta pelo canal de saída.">
+        <div class="arch-flow__step">POST /webhook<span>HMAC verificado</span></div>
+        <span class="arch-flow__arrow" aria-hidden="true">&rarr;</span>
+        <div class="arch-flow__step">Pub/Sub<span>message_received</span></div>
+        <span class="arch-flow__arrow" aria-hidden="true">&rarr;</span>
+        <div class="arch-flow__step">Consumidor<span>idempotente</span></div>
+        <span class="arch-flow__arrow" aria-hidden="true">&rarr;</span>
+        <div class="arch-flow__step">Grafo LangGraph<span>classify &rarr; supervisor &rarr; ...</span></div>
+        <span class="arch-flow__arrow" aria-hidden="true">&rarr;</span>
+        <div class="arch-flow__step">ChannelOutbound<span>resposta / proposta / handoff</span></div>
+      </div>
+
+      <div class="arch-grid">
+        <div class="arch-card">
+          <h4>Cloud Run</h4>
+          <p>A API e os workers batch (Opportunity Engine, campanha ativa) rodam como serviço e Jobs sob o mesmo container.</p>
+        </div>
+        <div class="arch-card">
+          <h4>Cloud SQL (PostgreSQL)</h4>
+          <p>Único banco de sistema — sessão, pedido, aprovação, auditoria e o checkpoint do próprio grafo LangGraph.</p>
+        </div>
+        <div class="arch-card">
+          <h4>Pub/Sub</h4>
+          <p>Backbone assíncrono entre o webhook e o processamento — desacopla a resposta ao WhatsApp do tempo de execução do grafo.</p>
+        </div>
+        <div class="arch-card">
+          <h4>Vertex AI / Gemini</h4>
+          <p>Único ponto de LLM real do sistema — classificação de intenção e geração da resposta ancorada, keyless via ADC.</p>
+        </div>
+        <div class="arch-card">
+          <h4>Cloud Storage + Cloud CDN</h4>
+          <p>Hospeda esta própria página — estática, sem servidor de aplicação, atrás de um Load Balancer HTTP global.</p>
+        </div>
+        <div class="arch-card">
+          <h4>Terraform</h4>
+          <p>Toda a infraestrutura acima é código versionado — <code>plan</code> comentado em todo PR, <code>apply</code> só no merge para <code>main</code>.</p>
+        </div>
+      </div>
+
+      <ul class="invariants">
+        <li><strong>O LLM não é fonte de verdade</strong> para preço, estoque, margem, identidade, pedido ou pagamento.</li>
+        <li><strong>Tool ausente é controle de segurança</strong> — um agente nunca vê uma ferramenta que não deveria existir para ele.</li>
+        <li><strong>Ação irreversível exige checkpoint</strong> — desconto fora de alçada pausa o grafo até um humano decidir.</li>
+        <li><strong>Nunca pagamento real</strong> e <strong>nunca documento fiscal real</strong> nesta versão — sandbox de ponta a ponta.</li>
+        <li><strong>Nenhum guardrail é removido</strong> para fazer um CI passar — quebrar uma invariante é bloqueio, não atalho.</li>
+        <li><strong>Todo turno é auditado</strong> — agente, modelo, ferramentas, custo e resultado, uma linha por turno, sempre.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="roadmap" aria-labelledby="roadmap-title">
+    <div class="container">
+      <div class="section__head">
+        <span class="eyebrow">O que vem a seguir</span>
+        <h2 id="roadmap-title">O roadmap não para nas 13 fatias entregues</h2>
+        <p>Cada item abaixo é uma decisão já registrada em ADR — não uma promessa vaga de "em breve".</p>
+      </div>
+
+      <div class="timeline">
+        <div class="timeline__item timeline__item--done">
+          <span class="timeline__dot" aria-hidden="true"></span>
+          <span class="timeline__tag">Você está aqui</span>
+          <h4>LANDING_PAGE</h4>
+          <p>Este site — GCS + Cloud CDN atrás de um Load Balancer HTTP global, sem domínio próprio ainda. Publicado direto do repositório, sem build step.</p>
+        </div>
+        <div class="timeline__item">
+          <span class="timeline__dot" aria-hidden="true"></span>
+          <span class="timeline__tag">Próxima fatia</span>
+          <h4>ANALYTICS <code>PRD-015</code></h4>
+          <p>Revenue Intelligence sobre o que já está sendo auditado — conversão de oportunidade em pedido, custo de IA por receita gerada, taxa de resposta e opt-out do contato ativo.</p>
+        </div>
+      </div>
+
+      <div class="followups">
+        <h4>Follow-ups já documentados nos ADRs</h4>
+        <ul>
+          <li>Cloud Scheduler encadeando os jobs de detecção de oportunidade e campanha (hoje rodam sob demanda)</li>
+          <li>WhatsApp Message Templates (HSM) aprovados pela Meta para contato fora da janela de 24h</li>
+          <li>Domínio próprio + HTTPS para esta landing page (a infra de CDN já está pronta para o upgrade)</li>
+          <li>Fluxo de opt-in via WhatsApp, simétrico ao guard de opt-out já em produção</li>
+          <li>Os 6 tipos de oportunidade do PRD-010 ainda não implementados (hoje: recompra atrasada e proposta parada)</li>
+          <li>Rotina de expiração (TTL) para aprovações, propostas e handoffs pendentes</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="container footer__inner">
+      <span class="footer__brand">RevenueFlow AI &mdash; construído em GCP, documentado a cada fatia.</span>
+      <ul class="footer__links">
+        <li><a href="https://github.com/JonatasLimaBR/revenueflow-ai" target="_blank" rel="noopener">Repositório</a></li>
+        <li><a href="https://github.com/JonatasLimaBR/revenueflow-ai/tree/main/docs/adrs" target="_blank" rel="noopener">ADRs</a></li>
+        <li><a href="#produto">Voltar ao topo</a></li>
+      </ul>
+    </div>
+  </footer>
+</body>
+</html>
