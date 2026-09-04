@@ -14,7 +14,12 @@ _pool: AsyncConnectionPool[AsyncConnection[Any]] | None = None
 def get_pool() -> AsyncConnectionPool[AsyncConnection[Any]]:
     global _pool
     if _pool is None:
-        _pool = AsyncConnectionPool(get_settings().database_url, open=False)
+        settings = get_settings()
+        _pool = AsyncConnectionPool(
+            settings.database_url,
+            open=False,
+            kwargs={"options": f"-c statement_timeout={settings.db_statement_timeout_ms}"},
+        )
     return _pool
 
 

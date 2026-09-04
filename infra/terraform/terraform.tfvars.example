@@ -11,7 +11,8 @@ tracer_sink   = "otel"
 
 # Optional alert thresholds (defaults shown).
 # alert_5xx_ratio              = 0.02
-# alert_p95_latency_ms         = 3000
+# alert_p95_latency_ms         = 3000   # deliberate early-warning at half the SPEC-035 5s target;
+#                                       # the hard turn cap is TURN_BUDGET_S=15s (ADR-057)
 # alert_tool_failures_per_hour = 10
 # alert_ai_cost_per_hour_usd   = 1.0
 # alert_no_turns_minutes       = 15
