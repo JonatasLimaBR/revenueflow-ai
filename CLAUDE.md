@@ -134,10 +134,7 @@ Fatias entregues, arquivadas em `.claude/sdd/archive/`:
   em `customer` + `outbound_contact`. Cloud Run Job `revenueflow-campaign-run` (espelha
   `revenueflow-opportunity-scan`; Cloud Scheduler é follow-up). **Sem** WhatsApp Message
   Templates (HSM) reais, opt-in inbound, ou personalização por LLM na V1 (ADR-059).
-
-Em revisão:
-
-- **LANDING_PAGE** (2026-09-04, ADR-060) — primeira fatia sem PRD/SPEC dedicado: um site estático
+- **LANDING_PAGE** (2026-09-04, PR #53, ADR-060) — primeira fatia sem PRD/SPEC dedicado: um site estático
   (`site/index.html` + `site/assets/styles.css`, sem framework/build step) detalhando as 13 fatias
   entregues (agrupadas em 6 fases) + arquitetura + roadmap, hospedado em GCS atrás de um Load
   Balancer HTTP global com Cloud CDN (`infra/terraform/landing_page.tf`, 7 recursos) — **sem**
