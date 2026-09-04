@@ -101,10 +101,7 @@ Fatias entregues, arquivadas em `.claude/sdd/archive/`:
   `v_ai_cost_per_revenue` (`audit_event` ⟕ `quote` ⟕ `sales_order` PAID). `apis.tf` +=
   `cloudtrace`/`logging`/`monitoring`; `iam.tf` += `roles/cloudtrace.agent`; `Dockerfile` instala
   `.[events,llm,observability]`.
-
-Em revisão:
-
-- **HARDENING_PERFORMANCE** (2026-09-03, ADR-057) — fecha a SPEC-035: impõe um orçamento de
+- **HARDENING_PERFORMANCE** (2026-09-04, PR #47, ADR-057) — fecha a SPEC-035: impõe um orçamento de
   latência. `asyncio.wait_for` em 3 lugares — cada tentativa da chamada Vertex em
   `_generate_with_retry` (`llm_call_timeout_s=6`; `TimeoutError` é transitório → retry → exaustão
   → `LLMError` → handoff), o `graph.ainvoke` nos 2 consumidores (`turn_budget_s=15` — teto de
