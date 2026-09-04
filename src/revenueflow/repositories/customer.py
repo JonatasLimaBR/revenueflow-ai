@@ -12,6 +12,7 @@ beyond the 365-day window and the average-ticket guard.
 
 from __future__ import annotations
 
+from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
@@ -21,11 +22,13 @@ from revenueflow.domain.models import Customer
 from revenueflow.repositories.db import execute, fetchall, fetchone
 
 _SELECT_BY_PHONE = (
-    "SELECT customer_id, phone, name, segment, created_at FROM customer WHERE phone = %s"
+    "SELECT customer_id, phone, name, segment, created_at, "
+    "consent_opt_in_at, consent_opt_out_at FROM customer WHERE phone = %s"
 )
 
 _SELECT_BY_ID = (
-    "SELECT customer_id, phone, name, segment, created_at FROM customer WHERE customer_id = %s"
+    "SELECT customer_id, phone, name, segment, created_at, "
+    "consent_opt_in_at, consent_opt_out_at FROM customer WHERE customer_id = %s"
 )
 
 _INSERT = """
@@ -33,6 +36,9 @@ INSERT INTO customer (customer_id, phone, name, segment)
 VALUES (%s, %s, %s, %s)
 ON CONFLICT (phone) DO NOTHING
 """
+
+_SET_OPT_IN = "UPDATE customer SET consent_opt_in_at = %s WHERE customer_id = %s"
+_SET_OPT_OUT = "UPDATE customer SET consent_opt_out_at = %s WHERE customer_id = %s"
 
 _AGG = """
 WITH orders AS (
@@ -78,6 +84,8 @@ def _to_customer(row: dict[str, Any]) -> Customer:
         name=row["name"],
         segment=row["segment"],
         created_at=row["created_at"],
+        consent_opt_in_at=row["consent_opt_in_at"],
+        consent_opt_out_at=row["consent_opt_out_at"],
     )
 
 
@@ -97,6 +105,14 @@ async def create(conn: AsyncConnection[Any], customer: Customer) -> None:
         _INSERT,
         (customer.customer_id, customer.phone, customer.name, customer.segment),
     )
+
+
+async def set_consent_opt_in(conn: AsyncConnection[Any], customer_id: str, at: datetime) -> None:
+    await execute(conn, _SET_OPT_IN, (at, customer_id))
+
+
+async def set_consent_opt_out(conn: AsyncConnection[Any], customer_id: str, at: datetime) -> None:
+    await execute(conn, _SET_OPT_OUT, (at, customer_id))
 
 
 async def customer_360(conn: AsyncConnection[Any], customer_id: str) -> dict[str, Any]:

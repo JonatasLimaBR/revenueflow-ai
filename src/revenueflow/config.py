@@ -32,6 +32,7 @@ class Settings(BaseSettings):
 
     replenishment_threshold: float = 1.5
     quote_recovery_hours: int = 72
+    campaign_frequency_cap_days: int = 14
 
     handoff_api_token: str = ""
     handoff_min_confidence: float = 0.55

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from datetime import UTC, datetime
 from typing import Any
 
 from langgraph.types import Command
@@ -23,6 +24,8 @@ from revenueflow.config import get_settings
 from revenueflow.domain.models import Intent, SessionStatus
 from revenueflow.events import EventEnvelope
 from revenueflow.observability import get_tracer, new_tracer, reset_tracer, set_tracer
+from revenueflow.policies import outbound_policy
+from revenueflow.repositories import customer as customer_repo
 from revenueflow.repositories import dispatch, processed_event
 from revenueflow.repositories import session as session_repo
 from revenueflow.repositories.db import execute, unit_of_work
@@ -37,6 +40,10 @@ _HELD_FOR_HANDOFF = "Sua conversa esta com um atendente humano; ele responde em 
 _SLOW_REPLY = (
     "Estamos com um volume alto agora e sua mensagem esta demorando mais que o normal. "
     "Ja retorno com a resposta."
+)
+
+_OPT_OUT_CONFIRMED = (
+    "Voce nao recebera mais contatos de campanha. Para duvidas, siga escrevendo normalmente."
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -130,6 +137,17 @@ async def process_event(
         if customer_id is not None:
             async with unit_of_work() as conn:
                 await session_repo.set_customer(conn, session.conversation_id, customer_id)
+
+        if outbound_policy.is_opt_out(text):
+            if customer_id is not None:
+                async with unit_of_work() as conn:
+                    await customer_repo.set_consent_opt_out(conn, customer_id, datetime.now(UTC))
+            await _send_once(
+                session.conversation_id, envelope.event_id, phone, _OPT_OUT_CONFIRMED, outbound
+            )
+            get_tracer().end(outcome="opted_out")
+            return True
+
         state_in: dict[str, Any] = {
             "conversation_id": session.conversation_id,
             "customer_text": text,

@@ -177,6 +177,8 @@ class Customer:
     name: str | None
     segment: str | None
     created_at: datetime
+    consent_opt_in_at: datetime | None = None
+    consent_opt_out_at: datetime | None = None
 
 
 class OpportunityType(StrEnum):
@@ -226,6 +228,34 @@ class Handoff:
     context: dict[str, Any]
     status: HandoffStatus
     created_at: datetime
+
+
+class CampaignContactStatus(StrEnum):
+    SENT = "SENT"
+    SKIPPED = "SKIPPED"
+    FAILED = "FAILED"
+
+
+class CampaignSkipReason(StrEnum):
+    NO_CONSENT = "no_consent"
+    OPTED_OUT = "opted_out"
+    FREQUENCY_CAPPED = "frequency_capped"
+
+
+@dataclass(frozen=True, slots=True)
+class CampaignDecision:
+    allowed: bool
+    reason: CampaignSkipReason | None = None
+
+
+@dataclass(slots=True)
+class OutboundContact:
+    contact_id: str
+    customer_id: str
+    opportunity_id: str
+    status: CampaignContactStatus
+    skip_reason: CampaignSkipReason | None
+    contacted_at: datetime
 
 
 @dataclass(slots=True)

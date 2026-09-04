@@ -124,11 +124,25 @@ Fatias entregues, arquivadas em `.claude/sdd/archive/`:
   **Sem** cifra a nível de campo / retention sweep / rate-limiting na V1 (ADR-032 = minimizar; RBAC
   do Cloud SQL é o controle). Sem dep, sem infra, sem migração. **Fecha o V1 core do PRD-016.**
 
+Em revisão:
+
+- **ACTIVE_SALES** (2026-09-04, ADR-059) — fecha o PRD-011: `services.campaign.run()` (batch, fora
+  do grafo, ADR-019/020) consome `opportunity(OPEN)`, roda o Policy Gate determinístico
+  (`policies.outbound_policy.evaluate` — opt-out > sem opt-in > frequência > permitido; `Customer`
+  ganha `consent_opt_in_at`/`consent_opt_out_at`) e envia uma mensagem template (sem LLM) via
+  `ChannelOutbound.send`, idempotente por dia (`dispatch_key=campaign:{opportunity_id}:{date}`),
+  registrando cada tentativa (`SENT`/`SKIPPED`/`FAILED`) em `outbound_contact` (log append-only,
+  sem PII de conteúdo). Guard de opt-out em `worker.consume.process_event` (antes do grafo, keyword
+  exata, sem `SessionStatus` novo) fecha o loop de opt-out do PRD-011. `0012` adiciona as 2 colunas
+  em `customer` + `outbound_contact`. Cloud Run Job `revenueflow-campaign-run` (espelha
+  `revenueflow-opportunity-scan`; Cloud Scheduler é follow-up). **Sem** WhatsApp Message
+  Templates (HSM) reais, opt-in inbound, ou personalização por LLM na V1 (ADR-059).
+
 Deploy: o ambiente GCP está no ar (Cloud Run `revenueflow-api`, Cloud SQL, Pub/Sub, Cloud Run
 Jobs `revenueflow-api-migrate` e `revenueflow-opportunity-scan`) via
 `.github/workflows/terraform.yml` (ADR-048); schema + catálogo simulado aplicados. Pendências
 operacionais: valores reais dos secrets do WhatsApp, registro do webhook no Meta,
-`gcloud run jobs execute revenueflow-api-migrate` para aplicar `0005`–`0011`, e preencher
+`gcloud run jobs execute revenueflow-api-migrate` para aplicar `0005`–`0012`, e preencher
 `alert_email` no tfvars para os alertas do Cloud Monitoring notificarem.
 
 O código de aplicação **existe** e não é mais scaffolding.
@@ -154,13 +168,13 @@ Mapa de `src/revenueflow/`:
 | `observability` | `mask()` de PII (email/CPF/phone + `extra_terms`, ADR-058); porta `Tracer` (`noop`/`langfuse`/`otel` + `AuditTracer` que envolve o sink, grava `audit_event` e emite a linha `audit.turn` por turno via `flush()`); `cost_usd()` (`MODEL_PRICES` do Vertex); `logging_setup` (`JsonFormatter` stdlib + `configure_logging`); `otel_setup` (`configure_otel` — `TracerProvider` + Cloud Trace exporter, ADR-056) |
 | `events` | `EventEnvelope`; porta `EventPublisher` (`in_memory`/`pubsub`) |
 | `adapters` | portas de canal; `verify_signature` + `parse_inbound`; `WhatsAppOutbound` + `FakeOutbound` |
-| `repositories` | pool async psycopg; `processed_event`/`dispatch` (idempotência); `session` (+`set_customer`)/`lead`/`customer` (`get_by_phone`/`customer_360`); `sim_*`; `sim_pricing`; `approval`; `checkout` (quote/order/payment); `opportunity` (`upsert_open`/`list_by_status`/`set_status` + queries de candidatos); `handoff` (`create` idempotente/`list_by_status`/`resolve`); `audit` (`record` `ON CONFLICT`/`by_conversation`) |
-| `policies` | `pricing_policy.evaluate()` (alçada/margem) + `opportunity_policy` (`replenishment`/`quote_recovery`) + `handoff_policy.should_handoff` (3 gatilhos) — regras puras, sem I/O nem LLM |
-| `services` | `ingest`, `session` (+`phone_for`), `identity` (`customer` antes do `lead`), `prompts` (v2), `llm` (stub + Vertex real), `intent`, `respond`, `pricing`, `negotiation`, `approval`, `checkout` (`is_explicit_confirmation` + `quote_from_state` + `confirm`), `opportunity` (`scan()` — batch, fora do grafo), `handoff` (`build_context` SPEC-027 + `create`/`list_pending`/`resolve`), `audit` (`persist` falha-isolada + `reconstruct`) |
+| `repositories` | pool async psycopg; `processed_event`/`dispatch` (idempotência); `session` (+`set_customer`)/`lead`/`customer` (`get_by_phone`/`customer_360`/`set_consent_opt_in`/`set_consent_opt_out`); `sim_*`; `sim_pricing`; `approval`; `checkout` (quote/order/payment); `opportunity` (`upsert_open`/`list_by_status`/`set_status` + queries de candidatos); `handoff` (`create` idempotente/`list_by_status`/`resolve`); `audit` (`record` `ON CONFLICT`/`by_conversation`); `outbound_contact` (`last_contact_at`/`record`) |
+| `policies` | `pricing_policy.evaluate()` (alçada/margem) + `opportunity_policy` (`replenishment`/`quote_recovery`) + `handoff_policy.should_handoff` (3 gatilhos) + `outbound_policy` (`evaluate` — Policy Gate de contato ativo; `is_opt_out` — guard inbound) — regras puras, sem I/O nem LLM |
+| `services` | `ingest`, `session` (+`phone_for`), `identity` (`customer` antes do `lead`), `prompts` (v2), `llm` (stub + Vertex real), `intent`, `respond`, `pricing`, `negotiation`, `approval`, `checkout` (`is_explicit_confirmation` + `quote_from_state` + `confirm`), `opportunity` (`scan()` — batch, fora do grafo), `handoff` (`build_context` SPEC-027 + `create`/`list_pending`/`resolve`), `audit` (`persist` falha-isolada + `reconstruct`), `campaign` (`run()` — batch, Policy Gate + envio, fora do grafo) |
 | `tools` | `RECOMMENDATION_TOOLS` (5 read-only, incl. `get_customer_360`) + `NEGOTIATION_TOOLS` (3 de pricing) + `CHECKOUT_TOOLS` (`create_quote`/`create_order`/`create_payment_sandbox`, determinísticas, registry isolado) + `registry` (fronteira — nenhum `set_discount`) |
 | `agents` | `TurnState`; `recommendation_node` (anexa `get_customer_360` p/ cliente conhecido); `negotiation_node` (+check `high_value_order`) + `await_approval_node` + `apply_decision_node` (ADR-050); `checkout_node` (quote/confirmação/order/payment, ADR-051); `handoff.py` (`to_handoff` + `handoff_node` que persiste + marca `HUMAN_HANDOFF`, ADR-054); `build_graph` |
 | `api` | `webhook` (GET verify + POST 202), `health` (`/healthz`), `approvals` (`/internal/approvals`, Bearer), `handoffs` (`/internal/handoffs`, Bearer), `audit` (`/internal/audit/{conversation_id}`, Bearer). `main.py` tem um `@app.middleware("http")` de headers de segurança (ADR-058) |
-| `worker` | `process_event` + `process_approval_decided` (consumidores idempotentes), `subscriber` (loop Pub/Sub, roteia por `event_type`) |
+| `worker` | `process_event` (+ guard de opt-out inbound antes do grafo) + `process_approval_decided` (consumidores idempotentes), `subscriber` (loop Pub/Sub, roteia por `event_type`) |
 
 Portas com impl `noop`/`in_memory`/`fake` por default: a suíte roda só com `postgres:16`. Os
 caminhos reais (`google-genai`, `google-cloud-pubsub`, `httpx` para a Graph API, `langfuse`) são
@@ -408,3 +422,4 @@ Claude deve localizar e ler os documentos relacionados antes de implementar.
 - [ADR-056 — OBSERVABILITY_OPS: OTel → Cloud Trace de produção + métricas via log-based metrics](docs/adrs/adr-056-observability-ops-otel-cloud-trace-and-log-metrics.md)
 - [ADR-057 — Orçamento de latência: timeout por dependência + teto duro no turno](docs/adrs/adr-057-latency-budget-per-dependency-timeout-and-turn-cap.md)
 - [ADR-058 — HARDENING_SECURITY_PII: security-by-architecture + mask() += CPF + suíte tests/security/](docs/adrs/adr-058-security-pii-hardening-pass.md)
+- [ADR-059 — ACTIVE_SALES: Policy Gate de contato ativo + job batch + guard de opt-out](docs/adrs/adr-059-active-sales-outbound-policy-gate.md)

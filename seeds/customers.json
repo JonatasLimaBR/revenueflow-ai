@@ -3,7 +3,8 @@
     "customer_id": "CUST-001",
     "phone": "5511900000001",
     "name": "Comercial Agua Viva Ltda",
-    "segment": "gold"
+    "segment": "gold",
+    "consent_opt_in_at": "2026-08-01T12:00:00Z"
   },
   {
     "customer_id": "CUST-002",
