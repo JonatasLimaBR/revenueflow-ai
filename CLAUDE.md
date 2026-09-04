@@ -111,12 +111,9 @@ Fatias entregues, arquivadas em `.claude/sdd/archive/`:
   **medido** (métrica/alerta da OBSERVABILITY_OPS), não imposto. `0011` cria 4 índices
   (`opportunity`/`handoff`/`approval` por `(status, created_at)`, `quote (customer_ref) WHERE
   status='SENT'`). Sem dep nova, sem infra nova.
-
-Em revisão:
-
-- **HARDENING_SECURITY_PII** (2026-09-04, ADR-058) — passada dedicada de SPEC-030/031/032. Fecha 2
-  lacunas concretas e **prova** as invariantes que a arquitetura já garante: `mask()` ganha um
-  regex de **CPF** (`_EMAIL → _CPF → _PHONE`; nome/endereço seguem via `extra_terms`); `main.py`
+- **HARDENING_SECURITY_PII** (2026-09-04, PR #49, ADR-058) — passada dedicada de SPEC-030/031/032.
+  Fecha 2 lacunas concretas e **prova** as invariantes que a arquitetura já garante: `mask()` ganha
+  um regex de **CPF** (`_EMAIL → _CPF → _PHONE`; nome/endereço seguem via `extra_terms`); `main.py`
   ganha um `@app.middleware("http")` que adiciona `X-Content-Type-Options`/`X-Frame-Options`/
   `Referrer-Policy`/`Strict-Transport-Security` a toda resposta (via `setdefault`). Suíte nova
   `tests/security/`: `test_pii_masking` (mask cobre phone/email/CPF; turno real → `audit_event.events`
@@ -125,7 +122,7 @@ Em revisão:
   `snapshot.next` tem `await_approval`; `is_explicit_confirmation` não carrega desconto do texto),
   `test_internal_routes_auth` (varredura `401`/`503` das 5 rotas `/internal/*`), `test_security_headers`.
   **Sem** cifra a nível de campo / retention sweep / rate-limiting na V1 (ADR-032 = minimizar; RBAC
-  do Cloud SQL é o controle). Sem dep, sem infra, sem migração.
+  do Cloud SQL é o controle). Sem dep, sem infra, sem migração. **Fecha o V1 core do PRD-016.**
 
 Deploy: o ambiente GCP está no ar (Cloud Run `revenueflow-api`, Cloud SQL, Pub/Sub, Cloud Run
 Jobs `revenueflow-api-migrate` e `revenueflow-opportunity-scan`) via
