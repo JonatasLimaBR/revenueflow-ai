@@ -27,3 +27,12 @@ resource "google_project_iam_member" "api_cloudtrace_agent" {
   role    = "roles/cloudtrace.agent"
   member  = "serviceAccount:${google_service_account.api.email}"
 }
+
+# Submits BigQuery load jobs (ADR-061). Dataset-level roles/bigquery.dataEditor
+# (analytics.tf) is the least-privilege data access; this is the project-level
+# permission BigQuery requires to run a job at all.
+resource "google_project_iam_member" "api_bigquery_job_user" {
+  project = var.project_id
+  role    = "roles/bigquery.jobUser"
+  member  = "serviceAccount:${google_service_account.api.email}"
+}

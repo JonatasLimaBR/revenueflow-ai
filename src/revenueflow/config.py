@@ -34,6 +34,8 @@ class Settings(BaseSettings):
     quote_recovery_hours: int = 72
     campaign_frequency_cap_days: int = 14
 
+    bigquery_dataset: str = "revenueflow_analytics"
+
     handoff_api_token: str = ""
     handoff_min_confidence: float = 0.55
     handoff_high_value_threshold: Decimal = Decimal("50000")

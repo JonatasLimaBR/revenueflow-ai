@@ -16,6 +16,7 @@ locals {
     "logging.googleapis.com",
     "monitoring.googleapis.com",
     "storage.googleapis.com",
+    "bigquery.googleapis.com",
   ])
 }
 
