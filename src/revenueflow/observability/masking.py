@@ -5,11 +5,13 @@ from typing import Any
 REDACTED = "***"
 
 _EMAIL = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
+_CPF = re.compile(r"(?<!\d)\d{3}\.?\d{3}\.?\d{3}-?\d{2}(?!\d)")
 _PHONE = re.compile(r"\+?\d[\d()\s.-]{6,}\d")
 
 
 def _mask_text(text: str, extra_terms: Sequence[str]) -> str:
     masked = _EMAIL.sub(REDACTED, text)
+    masked = _CPF.sub(REDACTED, masked)
     masked = _PHONE.sub(REDACTED, masked)
     for term in extra_terms:
         if term:
