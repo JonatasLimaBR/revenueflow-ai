@@ -123,11 +123,8 @@ Fatias entregues, arquivadas em `.claude/sdd/archive/`:
   `test_internal_routes_auth` (varredura `401`/`503` das 5 rotas `/internal/*`), `test_security_headers`.
   **Sem** cifra a nível de campo / retention sweep / rate-limiting na V1 (ADR-032 = minimizar; RBAC
   do Cloud SQL é o controle). Sem dep, sem infra, sem migração. **Fecha o V1 core do PRD-016.**
-
-Em revisão:
-
-- **ACTIVE_SALES** (2026-09-04, ADR-059) — fecha o PRD-011: `services.campaign.run()` (batch, fora
-  do grafo, ADR-019/020) consome `opportunity(OPEN)`, roda o Policy Gate determinístico
+- **ACTIVE_SALES** (2026-09-04, PR #51, ADR-059) — fecha o PRD-011: `services.campaign.run()`
+  (batch, fora do grafo, ADR-019/020) consome `opportunity(OPEN)`, roda o Policy Gate determinístico
   (`policies.outbound_policy.evaluate` — opt-out > sem opt-in > frequência > permitido; `Customer`
   ganha `consent_opt_in_at`/`consent_opt_out_at`) e envia uma mensagem template (sem LLM) via
   `ChannelOutbound.send`, idempotente por dia (`dispatch_key=campaign:{opportunity_id}:{date}`),
@@ -139,11 +136,12 @@ Em revisão:
   Templates (HSM) reais, opt-in inbound, ou personalização por LLM na V1 (ADR-059).
 
 Deploy: o ambiente GCP está no ar (Cloud Run `revenueflow-api`, Cloud SQL, Pub/Sub, Cloud Run
-Jobs `revenueflow-api-migrate` e `revenueflow-opportunity-scan`) via
+Jobs `revenueflow-api-migrate`, `revenueflow-opportunity-scan` e `revenueflow-campaign-run`) via
 `.github/workflows/terraform.yml` (ADR-048); schema + catálogo simulado aplicados. Pendências
 operacionais: valores reais dos secrets do WhatsApp, registro do webhook no Meta,
-`gcloud run jobs execute revenueflow-api-migrate` para aplicar `0005`–`0012`, e preencher
-`alert_email` no tfvars para os alertas do Cloud Monitoring notificarem.
+`gcloud run jobs execute revenueflow-api-migrate` para aplicar `0005`–`0012`, popular
+`consent_opt_in_at` de clientes reais antes de rodar `revenueflow-campaign-run` em produção, e
+preencher `alert_email` no tfvars para os alertas do Cloud Monitoring notificarem.
 
 O código de aplicação **existe** e não é mais scaffolding.
 
