@@ -50,12 +50,13 @@ ON CONFLICT (customer_id, product_id) DO UPDATE SET
 """
 
 UPSERT_CUSTOMER = """
-INSERT INTO customer (customer_id, phone, name, segment)
-VALUES (%s, %s, %s, %s)
+INSERT INTO customer (customer_id, phone, name, segment, consent_opt_in_at)
+VALUES (%s, %s, %s, %s, %s)
 ON CONFLICT (phone) DO UPDATE SET
     customer_id = EXCLUDED.customer_id,
     name = EXCLUDED.name,
-    segment = EXCLUDED.segment
+    segment = EXCLUDED.segment,
+    consent_opt_in_at = EXCLUDED.consent_opt_in_at
 """
 
 UPSERT_CUSTOMER_ORDER = """
@@ -143,6 +144,7 @@ def main() -> int:
                         entry["phone"],
                         entry.get("name"),
                         entry.get("segment"),
+                        entry.get("consent_opt_in_at"),
                     ),
                 )
             for order in customer_orders:
