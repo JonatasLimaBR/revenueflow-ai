@@ -222,9 +222,14 @@ CUSTOMER_360 (2026-09-03)** — o ambiente GitHub `production` tem um gate de ap
 (`required_reviewers`) que ficou parado por 17 deploys seguidos sem ninguém aprovar, e quando
 finalmente aprovado o `apply` falhou de verdade por IAM faltando na service account de deploy
 (`deployer_roles` sem `logging.admin`/`monitoring.admin`/`compute.admin` — corrigido no bootstrap,
-mas o bootstrap é aplicado manualmente, fora da CI, ADR-048). Até esse bootstrap ser reaplicado à
-mão, o dashboard (ADR-056), os alertas, e os recursos de Load Balancer da landing page (ADR-060/068)
-não existem de fato no GCP, mesmo com o código/Terraform corretos há dias. `revenueflow-api` e o
+mas o bootstrap é aplicado manualmente, fora da CI, ADR-048). Uma segunda tentativa de `apply`
+revelou mais duas camadas (ADR-070, só apareceram depois que as três primeiras foram corrigidas):
+faltava `bigquery.admin` também (`google_bigquery_dataset.analytics`, ADR-061), e
+`revenueflow-mcp-readonly` falhava o startup porque o pacote `mcp` lançou uma v2.x que renomeia
+`FastMCP` → `MCPServer` — `pyproject.toml` pedia só `mcp>=1.9` sem teto, corrigido pra
+`mcp>=1.9,<2`. Até o bootstrap ser reaplicado à mão, o dashboard (ADR-056), os alertas, e os
+recursos de Load Balancer da landing page (ADR-060/068) não existem de fato no GCP, mesmo com o
+código/Terraform corretos há dias. `revenueflow-api` e o
 schema/catálogo simulado são o que se confirmou aplicado até CUSTOMER_360; tudo depois disso
 (Cloud Run `revenueflow-mcp-readonly`, os Jobs `revenueflow-opportunity-scan`/
 `revenueflow-campaign-run`/`revenueflow-analytics-sync`/`revenueflow-lead-sweep`, a landing page,
@@ -544,3 +549,4 @@ Claude deve localizar e ler os documentos relacionados antes de implementar.
 - [ADR-067 — MCP público de leitura: novo Cloud Run service, Streamable HTTP, bearer compartilhado](docs/adrs/adr-067-public-readonly-mcp-server.md)
 - [ADR-068 — Domínio próprio da landing page: mastavista.com.br, cert gerenciado, redirect HTTP→HTTPS](docs/adrs/adr-068-custom-domain-landing-page.md)
 - [ADR-069 — Bootstrap: deployer_roles estava sem Logging/Monitoring/Compute admin](docs/adrs/adr-069-bootstrap-deployer-missing-iam-roles.md)
+- [ADR-070 — Segunda rodada de correções do deploy: IAM do BigQuery + pin da versão do mcp](docs/adrs/adr-070-bigquery-iam-and-mcp-version-pin.md)

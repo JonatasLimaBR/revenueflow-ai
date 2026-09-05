@@ -41,8 +41,11 @@ analytics = [
 ]
 # >=1.9 for FastMCP.streamable_http_app() (ADR-067, the public read-only HTTP
 # server); the personal stdio server (ADR-064) only needed the base package.
+# <2 pinned deliberately: mcp 2.x renamed FastMCP -> MCPServer and changed the
+# API (found live in production, ADR-070) — this code targets the v1 FastMCP
+# surface; migrating to 2.x's MCPServer is a follow-up, not this fix.
 mcp = [
-    "mcp>=1.9",
+    "mcp>=1.9,<2",
 ]
 
 [tool.setuptools.packages.find]
