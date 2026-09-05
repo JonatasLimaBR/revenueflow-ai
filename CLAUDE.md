@@ -156,6 +156,15 @@ Fatias entregues, arquivadas em `.claude/sdd/archive/`:
   escopado ao dataset (`google_bigquery_dataset_iam_member`, não a nível de projeto). Extra
   opcional `analytics` (`google-cloud-bigquery`, import lazy). **Sem** os outros 4 domínios do
   PRD-015, sem sync incremental/CDC, sem dashboard, sem Cloud Scheduler na V1 (ADR-061).
+- **LEAD_LIFECYCLE** (2026-09-05, ADR-062) — fecha uma lacuna achada ao escopar o Lead 360 do
+  PRD-015: `LeadStatus` nunca transicionava além de `NEW`, e nenhum lead virava `Customer` real
+  após comprar. `policies.lead_policy.evaluate` (pura, monotônica) avança
+  `NEW→QUALIFYING→QUALIFIED→PROPOSAL→WON` por sinal de intent/`final_outcome`, chamada a cada
+  turno em `worker.consume.process_event`; `WON` promove um `Customer` real (telefone do lead,
+  idempotente). `services.lead_lifecycle.sweep_stale()` (batch, Cloud Run Job
+  `revenueflow-lead-sweep`) move leads sem atividade recente para `LOST` (reusa
+  `conversation_session.last_interaction` via join — sem migração nova). Sem LLM, sem UI de CRM,
+  sem Cloud Scheduler na V1 (ADR-062).
 - **ANALYTICS_360** (2026-09-05, ADR-063) — fecha os 4 domínios restantes do PRD-015 (Customer 360,
   Lead 360, Opportunity 360, Conversation Analytics), pedidos explicitamente pelo usuário como
   fatia nova sobre o corte do ADR-061. 4 views novas no Postgres (`0014`, ao lado das existentes):
@@ -179,8 +188,8 @@ Fatias entregues, arquivadas em `.claude/sdd/archive/`:
   sem tool de escrita nova além das rotas já existentes (ADR-064).
 
 Deploy: o ambiente GCP está no ar (Cloud Run `revenueflow-api`, Cloud SQL, Pub/Sub, Cloud Run
-Jobs `revenueflow-api-migrate`, `revenueflow-opportunity-scan`, `revenueflow-campaign-run` e
-`revenueflow-analytics-sync`) via `.github/workflows/terraform.yml` (ADR-048); schema + catálogo
+Jobs `revenueflow-api-migrate`, `revenueflow-opportunity-scan`, `revenueflow-campaign-run`,
+`revenueflow-analytics-sync` e `revenueflow-lead-sweep`) via `.github/workflows/terraform.yml` (ADR-048); schema + catálogo
 simulado aplicados. Landing page em `http://<landing_page_ip>` (output do Terraform — sem domínio
 próprio ainda, ADR-060). Pendências operacionais: valores reais dos secrets do WhatsApp, registro
 do webhook no Meta, `gcloud run jobs execute revenueflow-api-migrate` para aplicar `0005`–`0014`,
@@ -206,19 +215,19 @@ Mapa de `src/revenueflow/`:
 
 | Pacote | Papel |
 |---|---|
-| `config` | `Settings` tipado (pydantic-settings) + flags `CHANNEL_OUTBOUND`/`TRACER_SINK`/`LLM_STUB`; `google_cloud_project`/`vertex_location`/`llm_max_retries`; `log_level`/`otel_service_name`; `llm_call_timeout_s`/`db_statement_timeout_ms`/`turn_budget_s`; `bigquery_dataset`; `revenueflow_api_base_url` |
+| `config` | `Settings` tipado (pydantic-settings) + flags `CHANNEL_OUTBOUND`/`TRACER_SINK`/`LLM_STUB`; `google_cloud_project`/`vertex_location`/`llm_max_retries`; `log_level`/`otel_service_name`; `llm_call_timeout_s`/`db_statement_timeout_ms`/`turn_budget_s`; `bigquery_dataset`; `lead_stale_days`; `revenueflow_api_base_url` |
 | `domain` | erros tipados; enums `SessionStatus` (+`HUMAN_HANDOFF`)/`LeadStatus`/`Intent`/`ApprovalStatus`/`QuoteStatus`/`OrderStatus`/`PaymentStatus`/`OpportunityType`/`OpportunityStatus`/`HandoffReason`/`HandoffStatus`; dataclasses de entidade (`Quote`/`Order`/`Payment`/`Customer`/`Opportunity`/`Handoff` incl.) |
 | `observability` | `mask()` de PII (email/CPF/phone + `extra_terms`, ADR-058); porta `Tracer` (`noop`/`langfuse`/`otel` + `AuditTracer` que envolve o sink, grava `audit_event` e emite a linha `audit.turn` por turno via `flush()`); `cost_usd()` (`MODEL_PRICES` do Vertex); `logging_setup` (`JsonFormatter` stdlib + `configure_logging`); `otel_setup` (`configure_otel` — `TracerProvider` + Cloud Trace exporter, ADR-056) |
 | `events` | `EventEnvelope`; porta `EventPublisher` (`in_memory`/`pubsub`) |
 | `adapters` | portas de canal; `verify_signature` + `parse_inbound`; `WhatsAppOutbound` + `FakeOutbound` |
-| `repositories` | pool async psycopg; `processed_event`/`dispatch` (idempotência); `session` (+`set_customer`)/`lead`/`customer` (`get_by_phone`/`customer_360`/`set_consent_opt_in`/`set_consent_opt_out`); `sim_*`; `sim_pricing`; `approval`; `checkout` (quote/order/payment); `opportunity` (`upsert_open`/`list_by_status`/`set_status` + queries de candidatos); `handoff` (`create` idempotente/`list_by_status`/`resolve`); `audit` (`record` `ON CONFLICT`/`by_conversation`); `outbound_contact` (`last_contact_at`/`record`); `analytics` (`conversation_revenue`/`cost_per_outcome`/`customer_360_all`/`lead_funnel`/`opportunity_summary`/`handoff_rate`, JSON-safe pra BigQuery) |
-| `policies` | `pricing_policy.evaluate()` (alçada/margem) + `opportunity_policy` (`replenishment`/`quote_recovery`) + `handoff_policy.should_handoff` (3 gatilhos) + `outbound_policy` (`evaluate` — Policy Gate de contato ativo; `is_opt_out` — guard inbound) — regras puras, sem I/O nem LLM |
-| `services` | `ingest`, `session` (+`phone_for`), `identity` (`customer` antes do `lead`), `prompts` (v2), `llm` (stub + Vertex real), `intent`, `respond`, `pricing`, `negotiation`, `approval`, `checkout` (`is_explicit_confirmation` + `quote_from_state` + `confirm`), `opportunity` (`scan()` — batch, fora do grafo), `handoff` (`build_context` SPEC-027 + `create`/`list_pending`/`resolve`), `audit` (`persist` falha-isolada + `reconstruct`), `campaign` (`run()` — batch, Policy Gate + envio, fora do grafo), `analytics_sync` (`run()` — batch, 6 cargas via `_SOURCES`, sync BigQuery `WRITE_TRUNCATE`, fora do grafo) |
+| `repositories` | pool async psycopg; `processed_event`/`dispatch` (idempotência); `session` (+`set_customer`)/`lead` (`get_by_phone`/`get_by_id`/`set_status`/`stale_candidates`)/`customer` (`get_by_phone`/`customer_360`/`set_consent_opt_in`/`set_consent_opt_out`); `sim_*`; `sim_pricing`; `approval`; `checkout` (quote/order/payment); `opportunity` (`upsert_open`/`list_by_status`/`set_status` + queries de candidatos); `handoff` (`create` idempotente/`list_by_status`/`resolve`); `audit` (`record` `ON CONFLICT`/`by_conversation`); `outbound_contact` (`last_contact_at`/`record`); `analytics` (`conversation_revenue`/`cost_per_outcome`/`customer_360_all`/`lead_funnel`/`opportunity_summary`/`handoff_rate`, JSON-safe pra BigQuery) |
+| `policies` | `pricing_policy.evaluate()` (alçada/margem) + `opportunity_policy` (`replenishment`/`quote_recovery`) + `handoff_policy.should_handoff` (3 gatilhos) + `outbound_policy` (`evaluate` — Policy Gate de contato ativo; `is_opt_out` — guard inbound) + `lead_policy.advance` (transição de status, monotônica) — regras puras, sem I/O nem LLM |
+| `services` | `ingest`, `session` (+`phone_for`), `identity` (`customer` antes do `lead`), `prompts` (v2), `llm` (stub + Vertex real), `intent`, `respond`, `pricing`, `negotiation`, `approval`, `checkout` (`is_explicit_confirmation` + `quote_from_state` + `confirm`), `opportunity` (`scan()` — batch, fora do grafo), `handoff` (`build_context` SPEC-027 + `create`/`list_pending`/`resolve`), `audit` (`persist` falha-isolada + `reconstruct`), `campaign` (`run()` — batch, Policy Gate + envio, fora do grafo), `analytics_sync` (`run()` — batch, 6 cargas via `_SOURCES`, sync BigQuery `WRITE_TRUNCATE`, fora do grafo), `lead_lifecycle` (`advance_from_turn` — síncrono, promove a Customer em `WON`; `sweep_stale()` — batch, `LOST`) |
 | `tools` | `RECOMMENDATION_TOOLS` (5 read-only, incl. `get_customer_360`) + `NEGOTIATION_TOOLS` (3 de pricing) + `CHECKOUT_TOOLS` (`create_quote`/`create_order`/`create_payment_sandbox`, determinísticas, registry isolado) + `registry` (fronteira — nenhum `set_discount`) |
 | `agents` | `TurnState`; `recommendation_node` (anexa `get_customer_360` p/ cliente conhecido); `negotiation_node` (+check `high_value_order`) + `await_approval_node` + `apply_decision_node` (ADR-050); `checkout_node` (quote/confirmação/order/payment, ADR-051); `handoff.py` (`to_handoff` + `handoff_node` que persiste + marca `HUMAN_HANDOFF`, ADR-054); `build_graph` |
 | `mcp` | Servidor MCP pessoal (ADR-064, extra opcional `mcp`, stdio): `tools.py` (leitura via `repositories.analytics` + ação via `httpx` nas rotas `/internal/*`, sem depender do pacote `mcp`) + `server.py` (encaixe fino `@mcp.tool()`) |
 | `api` | `webhook` (GET verify + POST 202), `health` (`/healthz`), `approvals` (`/internal/approvals`, Bearer), `handoffs` (`/internal/handoffs`, Bearer), `audit` (`/internal/audit/{conversation_id}`, Bearer). `main.py` tem um `@app.middleware("http")` de headers de segurança (ADR-058) |
-| `worker` | `process_event` (+ guard de opt-out inbound antes do grafo) + `process_approval_decided` (consumidores idempotentes), `subscriber` (loop Pub/Sub, roteia por `event_type`) |
+| `worker` | `process_event` (+ guard de opt-out inbound antes do grafo; + `lead_lifecycle.advance_from_turn` depois do `ainvoke`) + `process_approval_decided` (consumidores idempotentes), `subscriber` (loop Pub/Sub, roteia por `event_type`) |
 
 Portas com impl `noop`/`in_memory`/`fake` por default: a suíte roda só com `postgres:16`. Os
 caminhos reais (`google-genai`, `google-cloud-pubsub`, `httpx` para a Graph API, `langfuse`) são
@@ -483,5 +492,6 @@ Claude deve localizar e ler os documentos relacionados antes de implementar.
 - [ADR-059 — ACTIVE_SALES: Policy Gate de contato ativo + job batch + guard de opt-out](docs/adrs/adr-059-active-sales-outbound-policy-gate.md)
 - [ADR-060 — LANDING_PAGE: hosting estático GCS + Cloud CDN, sem domínio/HTTPS na V1](docs/adrs/adr-060-landing-page-gcs-cdn.md)
 - [ADR-061 — ANALYTICS: sync batch Postgres → BigQuery, domínio Revenue + Custo de IA](docs/adrs/adr-061-analytics-bigquery-revenue-cost.md)
+- [ADR-062 — LEAD_LIFECYCLE: transições determinísticas de status + promoção lead→customer](docs/adrs/adr-062-lead-lifecycle-deterministic-transitions.md)
 - [ADR-063 — ANALYTICS_360: os 4 domínios restantes do PRD-015](docs/adrs/adr-063-analytics-360-remaining-prd015-domains.md)
 - [ADR-064 — Servidor MCP pessoal: leitura + operações internas já existentes, stdio](docs/adrs/adr-064-personal-mcp-server-read-and-internal-ops.md)
