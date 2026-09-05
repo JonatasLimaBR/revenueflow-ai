@@ -30,9 +30,7 @@ def verify_google_token(id_token: str, *, client_id: str) -> str | None:
     from google.oauth2 import id_token as google_id_token
 
     try:
-        claims = google_id_token.verify_oauth2_token(  # type: ignore[no-untyped-call]
-            id_token, google_requests.Request(), client_id
-        )
+        claims = google_id_token.verify_oauth2_token(id_token, google_requests.Request(), client_id)
     except Exception:
         return None
     email = claims.get("email")

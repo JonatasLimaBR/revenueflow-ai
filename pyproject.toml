@@ -106,6 +106,16 @@ ignore_missing_imports = true
 module = ["revenueflow.mcp.server"]
 disallow_untyped_decorators = false
 
+[[tool.mypy.overrides]]
+# ``google.oauth2.id_token.verify_oauth2_token`` is untyped upstream (no stubs
+# in CI, see the google.oauth2 override above) — a local env with the optional
+# ``portal`` extra installed sees real (untyped) signatures and flags the call,
+# while CI (extra not installed) sees ``Any`` and flags nothing; a per-call
+# ``type: ignore`` is therefore inconsistent between the two. Disabling
+# disallow_untyped_calls for just this module covers both environments.
+module = ["revenueflow.portal.auth"]
+disallow_untyped_calls = false
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
