@@ -135,6 +135,20 @@ resource "google_monitoring_dashboard" "revenueflow_ops" {
   depends_on = [google_project_service.this]
 }
 
+# Read-only dashboard access for teammates without a full project role
+# (ADR-065). Cloud Monitoring has no per-dashboard IAM — roles/monitoring.viewer
+# at the project level is the narrowest predefined role available; it grants
+# read access to dashboards/metrics/alerting policies only, nothing else in
+# the project. Empty by default (var.dashboard_viewer_emails) until the user
+# provides real emails to onboard.
+resource "google_project_iam_member" "dashboard_viewer" {
+  for_each = toset(var.dashboard_viewer_emails)
+
+  project = var.project_id
+  role    = "roles/monitoring.viewer"
+  member  = "user:${each.value}"
+}
+
 resource "google_monitoring_alert_policy" "request_5xx_ratio" {
   display_name = "RevenueFlow 5xx ratio high"
   combiner     = "OR"

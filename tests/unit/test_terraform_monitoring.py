@@ -40,3 +40,19 @@ def test_dashboard_json_is_valid_and_references_expected_metrics() -> None:
     blob = json.dumps(payload)
     assert "run.googleapis.com/request_" in blob
     assert "logging.googleapis.com/user/revenueflow_" in blob
+
+
+def test_dashboard_viewer_emails_variable_defaults_to_empty_list() -> None:
+    body = (_TF / "variables.tf").read_text()
+    assert 'variable "dashboard_viewer_emails"' in body
+    block = body.split('variable "dashboard_viewer_emails"', 1)[1].split("variable ", 1)[0]
+    assert "default     = []" in block
+
+
+def test_dashboard_viewer_iam_is_monitoring_viewer_only() -> None:
+    body = (_TF / "monitoring.tf").read_text()
+    assert 'resource "google_project_iam_member" "dashboard_viewer"' in body
+    block = body.split('resource "google_project_iam_member" "dashboard_viewer"', 1)[1]
+    assert "for_each" in block
+    assert "roles/monitoring.viewer" in block
+    assert "roles/viewer" not in block
