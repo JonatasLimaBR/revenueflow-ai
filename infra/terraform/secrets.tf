@@ -12,6 +12,8 @@ locals {
     APPROVAL_API_TOKEN       = "revenueflow-approval-api-token"
     HANDOFF_API_TOKEN        = "revenueflow-handoff-api-token"
     MCP_API_TOKEN            = "revenueflow-mcp-api-token"
+    PORTAL_GOOGLE_CLIENT_ID  = "revenueflow-portal-google-client-id"
+    PORTAL_SESSION_SECRET    = "revenueflow-portal-session-secret"
   }
 }
 
@@ -98,6 +100,23 @@ resource "random_password" "mcp_token" {
 resource "google_secret_manager_secret_version" "mcp_api_token" {
   secret      = google_secret_manager_secret.manual["MCP_API_TOKEN"].id
   secret_data = random_password.mcp_token.result
+}
+
+# The portal's session-cookie signing secret (ADR-073) — same
+# Terraform-generated pattern as the approval/handoff/mcp tokens (not a
+# manual gcloud step). PORTAL_GOOGLE_CLIENT_ID stays a manual secret (it's a
+# public OAuth Client ID, not a real secret, but follows the same
+# manual-config pattern as the WhatsApp secrets until the user creates it in
+# the Google Cloud Console). Read the current session secret with:
+#   gcloud secrets versions access latest --secret=revenueflow-portal-session-secret
+resource "random_password" "portal_session_secret" {
+  length  = 48
+  special = false
+}
+
+resource "google_secret_manager_secret_version" "portal_session_secret" {
+  secret      = google_secret_manager_secret.manual["PORTAL_SESSION_SECRET"].id
+  secret_data = random_password.portal_session_secret.result
 }
 
 resource "google_secret_manager_secret_iam_member" "api_manual" {

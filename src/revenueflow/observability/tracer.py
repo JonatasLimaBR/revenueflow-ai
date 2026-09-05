@@ -19,6 +19,7 @@ from typing import Any, Protocol, runtime_checkable
 from uuid import uuid4
 
 from revenueflow.config import get_settings
+from revenueflow.observability.live import notify_agent_end, notify_agent_start
 from revenueflow.observability.masking import mask
 
 _LOGGER = logging.getLogger(__name__)
@@ -460,8 +461,11 @@ class AuditTracer:
         if attrs:
             entry["attrs"] = _masked_mapping(attrs)
         self._events.append(entry)
+        node_agent: str | None = None
         if name.startswith("node."):
-            self._agent = name[len("node.") :]
+            node_agent = name[len("node.") :]
+            self._agent = node_agent
+            notify_agent_start(conversation_id=self._conversation_id, agent=node_agent)
         with self._primary.span(name, attrs=attrs) as inner:
             buffered = _BufferedSpan(entry, inner, time.perf_counter())
             try:
@@ -469,6 +473,9 @@ class AuditTracer:
             except BaseException:
                 entry["error"] = True
                 raise
+            finally:
+                if node_agent is not None:
+                    notify_agent_end(conversation_id=self._conversation_id, agent=node_agent)
 
     @contextmanager
     def generation(

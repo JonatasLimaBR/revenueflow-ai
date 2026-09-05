@@ -17,6 +17,8 @@ dependencies = [
     "uvicorn[standard]>=0.30",
     "langgraph>=0.2.28",
     "langgraph-checkpoint-postgres>=2.0.1",
+    "jinja2>=3.1",
+    "python-multipart>=0.0.9",
 ]
 
 [project.optional-dependencies]
@@ -46,6 +48,15 @@ analytics = [
 # surface; migrating to 2.x's MCPServer is a follow-up, not this fix.
 mcp = [
     "mcp>=1.9,<2",
+]
+# Operational portal (ADR-073): Google Sign-In verification (client-side
+# token, no client secret). jinja2/python-multipart are base dependencies
+# (see above) — unlike google-auth, both are needed just to import
+# portal/views.py (Jinja2Templates + Form(...) routes), so gating them behind
+# this extra would make the whole package unimportable in CI's base `tests`
+# job (installs only `.[dev,llm]`, never `portal`).
+portal = [
+    "google-auth>=2.34",
 ]
 
 [tool.setuptools.packages.find]
@@ -88,12 +99,26 @@ module = ["mcp", "mcp.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
+module = ["google.auth", "google.auth.*", "google.oauth2", "google.oauth2.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
 # ``mcp.tool()`` resolves to ``Any`` (the package has no stubs available in CI,
 # see the override above) — strict mode's disallow_untyped_decorators would
 # otherwise flag every ``@mcp.tool()``-decorated function in this thin wiring
 # module.
 module = ["revenueflow.mcp.server"]
 disallow_untyped_decorators = false
+
+[[tool.mypy.overrides]]
+# ``google.oauth2.id_token.verify_oauth2_token`` is untyped upstream (no stubs
+# in CI, see the google.oauth2 override above) — a local env with the optional
+# ``portal`` extra installed sees real (untyped) signatures and flags the call,
+# while CI (extra not installed) sees ``Any`` and flags nothing; a per-call
+# ``type: ignore`` is therefore inconsistent between the two. Disabling
+# disallow_untyped_calls for just this module covers both environments.
+module = ["revenueflow.portal.auth"]
+disallow_untyped_calls = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

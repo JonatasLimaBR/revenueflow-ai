@@ -61,3 +61,8 @@ output "mcp_readonly_url" {
   description = "Public read-only MCP server URL (ADR-067) — add /mcp and the Authorization: Bearer <MCP_API_TOKEN> header in the client config"
   value       = google_cloud_run_v2_service.mcp_readonly.uri
 }
+
+output "portal_url" {
+  description = "Operational portal URL (ADR-073) — /portal/login; requires PORTAL_GOOGLE_CLIENT_ID configured and the visitor's email in dashboard_viewer_emails"
+  value       = google_cloud_run_v2_service.portal.uri
+}

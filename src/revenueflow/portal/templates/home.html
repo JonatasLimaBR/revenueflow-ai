@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %} — Home{% endblock %}
+{% block content %}
+<h1 style="font-size:1.3rem;">Visão geral</h1>
+<div class="kpis">
+  <div class="card kpi"><div class="value">${{ "%.2f"|format(total_revenue) }}</div><div class="label">Receita</div></div>
+  <div class="card kpi"><div class="value">${{ "%.4f"|format(total_ai_cost) }}</div><div class="label">Custo de IA</div></div>
+  <div class="card kpi"><div class="value">{{ conversation_count }}</div><div class="label">Conversas</div></div>
+  <div class="card kpi"><div class="value">{{ "%.1f"|format(handoff_rate * 100) }}%</div><div class="label">Taxa de handoff</div></div>
+</div>
+<div class="card">
+  <h2 style="font-size:1rem; margin-top:0;">Custo por outcome</h2>
+  {% if cost_rows %}
+  <table>
+    <tr><th>Outcome</th><th>Turnos</th><th>Custo total</th></tr>
+    {% for row in cost_rows %}
+    <tr><td>{{ row.outcome }}</td><td>{{ row.turns }}</td><td>${{ "%.4f"|format(row.cost_usd) }}</td></tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p class="empty">Nenhuma conversa ainda.</p>
+  {% endif %}
+</div>
+{% endblock %}
+{% block autorefresh %}<script>setInterval(() => location.reload(), 30000);</script>{% endblock %}

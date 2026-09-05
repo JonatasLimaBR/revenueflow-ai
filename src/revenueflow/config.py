@@ -63,6 +63,10 @@ class Settings(BaseSettings):
     revenueflow_api_base_url: str = "http://localhost:8080"
     mcp_api_token: str = ""
 
+    portal_viewer_emails: str = ""
+    portal_google_client_id: str = ""
+    portal_session_secret: str = ""
+
 
 @lru_cache
 def get_settings() -> Settings:

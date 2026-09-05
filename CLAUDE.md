@@ -216,6 +216,24 @@ Fatias entregues, arquivadas em `.claude/sdd/archive/`:
   (default = o domínio real; vazio desliga tudo e mantém o comportamento HTTP-only do ADR-060).
   DNS fica fora do Terraform — apontar o registro A pro `landing_page_ip` é passo manual do
   usuário no provedor de DNS; o cert fica `PROVISIONING` até isso resolver.
+- **PORTAL** (2026-09-05, ADR-073) — portal operacional web pedido explicitamente pelo usuário
+  (nenhuma aplicação própria existia — só páginas do Console GCP gateadas por IAM). Novo Cloud Run
+  service `revenueflow-api-portal` (`scripts/portal_server.py`, mesma imagem da API, mesmo padrão
+  do MCP público). Leitura direto de `repositories.analytics`/`audit`/`portal` (`quote`/
+  `sales_order`/`payment`/`conversation_session`, sem migração nova); ação (aprovar/rejeitar/
+  resolver) via `httpx` contra as MESMAS rotas `/internal/approvals`/`/internal/handoffs` do MCP
+  pessoal (ADR-064) — o portal nunca escreve direto em tabela de estado (ADR-037). Autenticação:
+  Google Sign-In client-side (`google-auth`, sem client secret) + allowlist reaproveitando
+  `var.dashboard_viewer_emails` (ADR-065, mesma lista) + cookie de sessão HMAC (TTL 12h). Painel de
+  agentes ao vivo: `AuditTracer.span()` ganha um `NOTIFY` Postgres best-effort
+  (`observability/live.py`, fire-and-forget, nunca propaga erro pro turno); `GET
+  /portal/live/stream` (SSE) faz `LISTEN` e destaca o nó ativo do grafo em tempo real —
+  `min_instance_count=1` no serviço do portal (único do projeto que não escala a zero) pra não
+  perder eventos. IAP considerado e rejeitado (exigiria criar um "IAP brand" irreversível no
+  projeto). Extra opcional `portal` (`google-auth`, `jinja2`). Pendente: criar o OAuth Client ID
+  "Web application" no Google Cloud Console (origem JavaScript = URL do portal) e preencher
+  `PORTAL_GOOGLE_CLIENT_ID` via `gcloud secrets versions add` — mesmo padrão dos secrets manuais do
+  WhatsApp.
 
 Deploy: **auditoria em 2026-09-05 (ADR-069 a 072) achou que nenhum deploy real tinha rodado desde
 CUSTOMER_360 (2026-09-03)** — o ambiente GitHub `production` tem um gate de aprovação manual
@@ -262,9 +280,10 @@ Mapa de `src/revenueflow/`:
 
 | Pacote | Papel |
 |---|---|
-| `config` | `Settings` tipado (pydantic-settings) + flags `CHANNEL_OUTBOUND`/`TRACER_SINK`/`LLM_STUB`; `google_cloud_project`/`vertex_location`/`llm_max_retries`; `log_level`/`otel_service_name`; `llm_call_timeout_s`/`db_statement_timeout_ms`/`turn_budget_s`; `bigquery_dataset`; `lead_stale_days`; `revenueflow_api_base_url`; `mcp_api_token` |
+| `config` | `Settings` tipado (pydantic-settings) + flags `CHANNEL_OUTBOUND`/`TRACER_SINK`/`LLM_STUB`; `google_cloud_project`/`vertex_location`/`llm_max_retries`; `log_level`/`otel_service_name`; `llm_call_timeout_s`/`db_statement_timeout_ms`/`turn_budget_s`; `bigquery_dataset`; `lead_stale_days`; `revenueflow_api_base_url`; `mcp_api_token`;
+`portal_viewer_emails`/`portal_google_client_id`/`portal_session_secret` |
 | `domain` | erros tipados; enums `SessionStatus` (+`HUMAN_HANDOFF`)/`LeadStatus`/`Intent`/`ApprovalStatus`/`QuoteStatus`/`OrderStatus`/`PaymentStatus`/`OpportunityType`/`OpportunityStatus`/`HandoffReason`/`HandoffStatus`; dataclasses de entidade (`Quote`/`Order`/`Payment`/`Customer`/`Opportunity`/`Handoff` incl.) |
-| `observability` | `mask()` de PII (email/CPF/phone + `extra_terms`, ADR-058); porta `Tracer` (`noop`/`langfuse`/`otel` + `AuditTracer` que envolve o sink, grava `audit_event` e emite a linha `audit.turn` por turno via `flush()`); `cost_usd()` (`MODEL_PRICES` do Vertex); `logging_setup` (`JsonFormatter` stdlib + `configure_logging`); `otel_setup` (`configure_otel` — `TracerProvider` + Cloud Trace exporter, ADR-056) |
+| `observability` | `mask()` de PII (email/CPF/phone + `extra_terms`, ADR-058); porta `Tracer` (`noop`/`langfuse`/`otel` + `AuditTracer` que envolve o sink, grava `audit_event` e emite a linha `audit.turn` por turno via `flush()`; `span()` também dispara `live.notify_agent_start`/`_end`, ADR-073); `live.py` (`NOTIFY`/`LISTEN` best-effort do painel de agentes ao vivo do portal); `cost_usd()` (`MODEL_PRICES` do Vertex); `logging_setup` (`JsonFormatter` stdlib + `configure_logging`); `otel_setup` (`configure_otel` — `TracerProvider` + Cloud Trace exporter, ADR-056) |
 | `events` | `EventEnvelope`; porta `EventPublisher` (`in_memory`/`pubsub`) |
 | `adapters` | portas de canal; `verify_signature` + `parse_inbound`; `WhatsAppOutbound` + `FakeOutbound` |
 | `repositories` | pool async psycopg; `processed_event`/`dispatch` (idempotência); `session` (+`set_customer`)/`lead` (`get_by_phone`/`get_by_id`/`set_status`/`stale_candidates`)/`customer` (`get_by_phone`/`customer_360`/`set_consent_opt_in`/`set_consent_opt_out`); `sim_*`; `sim_pricing`; `approval`; `checkout` (quote/order/payment); `opportunity` (`upsert_open`/`list_by_status`/`set_status` + queries de candidatos); `handoff` (`create` idempotente/`list_by_status`/`resolve`); `audit` (`record` `ON CONFLICT`/`by_conversation`); `outbound_contact` (`last_contact_at`/`record`); `analytics` (`conversation_revenue`/`cost_per_outcome`/`customer_360_all`/`lead_funnel`/`opportunity_summary`/`handoff_rate`, JSON-safe pra BigQuery) |
@@ -274,6 +293,7 @@ Mapa de `src/revenueflow/`:
 | `agents` | `TurnState`; `recommendation_node` (anexa `get_customer_360` p/ cliente conhecido); `negotiation_node` (+check `high_value_order`) + `await_approval_node` + `apply_decision_node` (ADR-050); `checkout_node` (quote/confirmação/order/payment, ADR-051); `handoff.py` (`to_handoff` + `handoff_node` que persiste + marca `HUMAN_HANDOFF`, ADR-054); `build_graph` |
 | `mcp` | `tools.py` (leitura via `repositories.analytics` + ação via `httpx` nas rotas `/internal/*`, sem depender do pacote `mcp`) + `auth.py` (`bearer_gate` ASGI, também sem depender do pacote `mcp`) + `server.py` (`register_read_tools`/`register_action_tools`; servidor pessoal stdio, ADR-064, os dois) + `http_server.py` (servidor público Streamable HTTP, ADR-067, só `register_read_tools`) |
 | `api` | `webhook` (GET verify + POST 202), `health` (`/healthz`), `approvals` (`/internal/approvals`, Bearer), `handoffs` (`/internal/handoffs`, Bearer), `audit` (`/internal/audit/{conversation_id}`, Bearer). `main.py` tem um `@app.middleware("http")` de headers de segurança (ADR-058) |
+| `portal` | `auth.py` (Google Sign-In + allowlist + cookie de sessão, sem depender de banco/rede) + `views.py` (rotas de leitura via `repositories.*` + ação via `httpx` nas rotas `/internal/*`, nunca escreve direto) + `server.py` (app FastAPI própria, mesmo middleware de segurança do `main.py`) + `templates/` (Jinja2, sem SPA); painel ao vivo via `observability/live.py` (ADR-073) |
 | `worker` | `process_event` (+ guard de opt-out inbound antes do grafo; + `lead_lifecycle.advance_from_turn` depois do `ainvoke`) + `process_approval_decided` (consumidores idempotentes), `subscriber` (loop Pub/Sub, roteia por `event_type`) |
 
 Portas com impl `noop`/`in_memory`/`fake` por default: a suíte roda só com `postgres:16`. Os
@@ -550,3 +570,4 @@ Claude deve localizar e ler os documentos relacionados antes de implementar.
 - [ADR-070 — Segunda rodada de correções do deploy: IAM do BigQuery + pin da versão do mcp](docs/adrs/adr-070-bigquery-iam-and-mcp-version-pin.md)
 - [ADR-071 — ALIGN_SUM não escalariza métrica DISTRIBUTION: métricas gêmeas pra alerta](docs/adrs/adr-071-distribution-metric-alert-sum-fix.md)
 - [ADR-072 — Correção do ADR-071: value_extractor só existe pra métrica DISTRIBUTION](docs/adrs/adr-072-value-extractor-requires-distribution.md)
+- [ADR-073 — Portal operacional: Google Sign-In + wrapper sobre rotas internas + painel ao vivo via Postgres LISTEN/NOTIFY](docs/adrs/adr-073-operational-portal.md)

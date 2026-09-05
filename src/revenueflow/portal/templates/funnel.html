@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %} — Funil{% endblock %}
+{% block content %}
+<h1 style="font-size:1.3rem;">Funil de leads</h1>
+<div class="card" style="margin-bottom:1.5rem;">
+{% if leads %}
+<table>
+  <tr><th>Lead</th><th>Status</th><th>Criado em</th></tr>
+  {% for l in leads %}
+  <tr><td>{{ l.lead_id }}</td><td><span class="pill">{{ l.status }}</span></td><td>{{ l.created_at }}</td></tr>
+  {% endfor %}
+</table>
+{% else %}
+<p class="empty">Nenhum lead ainda.</p>
+{% endif %}
+</div>
+<h1 style="font-size:1.3rem;">Oportunidades</h1>
+<div class="card">
+{% if opportunities %}
+<table>
+  <tr><th>Oportunidade</th><th>Cliente</th><th>Tipo</th><th>Status</th><th>Receita estimada</th><th>Probabilidade</th></tr>
+  {% for o in opportunities %}
+  <tr>
+    <td>{{ o.opportunity_id }}</td>
+    <td>{{ o.customer_id }}</td>
+    <td>{{ o.opportunity_type }}</td>
+    <td><span class="pill">{{ o.status }}</span></td>
+    <td>${{ "%.2f"|format(o.estimated_revenue|float) }}</td>
+    <td>{{ "%.0f"|format(o.probability * 100) }}%</td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<p class="empty">Nenhuma oportunidade ainda.</p>
+{% endif %}
+</div>
+{% endblock %}

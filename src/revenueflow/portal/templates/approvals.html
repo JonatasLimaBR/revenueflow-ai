@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %} — Aprovações{% endblock %}
+{% block content %}
+<h1 style="font-size:1.3rem;">Aprovações pendentes</h1>
+{% if approvals %}
+{% for a in approvals %}
+<div class="card" style="margin-bottom:1rem;">
+  <p><strong>{{ a.approval_id }}</strong> · conversa {{ a.conversation_id }} · desconto pedido {{ a.requested_discount }} · valor ${{ a.amount }}</p>
+  <p style="color:var(--muted); font-size:0.85rem;">{{ a.reason }} · expira em {{ a.expires_at or "—" }}</p>
+  <form class="inline" method="post" action="/portal/approvals/{{ a.approval_id }}">
+    <input type="hidden" name="decision" value="approve">
+    <button type="submit">Aprovar</button>
+  </form>
+  <form class="inline" method="post" action="/portal/approvals/{{ a.approval_id }}">
+    <input type="hidden" name="decision" value="reject">
+    <button class="secondary" type="submit">Rejeitar</button>
+  </form>
+  <form class="inline" method="post" action="/portal/approvals/{{ a.approval_id }}">
+    <input type="hidden" name="decision" value="approve_with_override">
+    <input type="text" name="discount_pct" placeholder="% desconto" style="width:90px;">
+    <button class="secondary" type="submit">Aprovar com override</button>
+  </form>
+</div>
+{% endfor %}
+{% else %}
+<div class="card"><p class="empty">Nenhuma aprovação pendente.</p></div>
+{% endif %}
+{% endblock %}
+{% block autorefresh %}<script>setInterval(() => location.reload(), 30000);</script>{% endblock %}

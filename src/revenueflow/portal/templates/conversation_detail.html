@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %} — Conversa{% endblock %}
+{% block content %}
+<h1 style="font-size:1.3rem;">Conversa {{ conversation_id }}</h1>
+<p style="color:var(--muted);">{{ phone or "telefone indisponível" }}
+  · <a href="/portal/conversations/{{ conversation_id }}/audit.json">exportar auditoria (JSON)</a></p>
+<div class="card">
+{% if turns %}
+{% for turn in turns %}
+<details style="margin-bottom:0.75rem; border-bottom:1px solid var(--border); padding-bottom:0.75rem;">
+  <summary>
+    <strong>{{ turn.agent or "—" }}</strong>
+    <span class="pill">{{ turn.outcome }}</span>
+    · ${{ "%.4f"|format(turn.cost_usd|float) }} · {{ turn.latency_ms }}ms
+  </summary>
+  <pre style="white-space:pre-wrap; font-size:0.8rem; color:var(--muted);">{{ turn.events | tojson(indent=2) }}</pre>
+</details>
+{% endfor %}
+{% else %}
+<p class="empty">Nenhum turno auditado ainda pra esta conversa.</p>
+{% endif %}
+</div>
+{% endblock %}

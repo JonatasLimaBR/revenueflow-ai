@@ -14,10 +14,12 @@ COPY src ./src
 # (TRACER_SINK=otel, ADR-056); [analytics] pulls google-cloud-bigquery for the
 # revenue/cost sync batch job (revenueflow-analytics-sync, ADR-061); [mcp]
 # pulls the MCP SDK for the public read-only HTTP server
-# (revenueflow-mcp-readonly, ADR-067) — same image, different command. Without
+# (revenueflow-mcp-readonly, ADR-067) — same image, different command; [portal]
+# pulls google-auth + jinja2 for the operational portal
+# (revenueflow-api-portal, ADR-073) — same image, different command. Without
 # them run_subscriber() / model calls / span export / scripts/sync_analytics.py
-# / scripts/mcp_http_server.py die.
-RUN pip install --upgrade pip && pip install -e ".[events,llm,observability,analytics,mcp]"
+# / scripts/mcp_http_server.py / scripts/portal_server.py die.
+RUN pip install --upgrade pip && pip install -e ".[events,llm,observability,analytics,mcp,portal]"
 
 COPY migrations ./migrations
 COPY seeds ./seeds

@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %} — Agentes ao vivo{% endblock %}
+{% block head %}
+<style>
+  .graph { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; }
+  .node { border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem 0.9rem; background: var(--card); font-size: 0.85rem; transition: all 0.15s ease; }
+  .node.active { border-color: #22c55e; box-shadow: 0 0 0 3px rgba(34,197,94,0.25); background: #052e16; }
+  .arrow { color: var(--muted); }
+  #log { margin-top: 1.5rem; font-family: monospace; font-size: 0.8rem; color: var(--muted); max-height: 240px; overflow-y: auto; }
+</style>
+{% endblock %}
+{% block content %}
+<h1 style="font-size:1.3rem;">Agentes ao vivo</h1>
+<p style="color:var(--muted); font-size:0.85rem;">O nó acende quando um turno real está sendo processado por aquele agente.</p>
+<div class="card">
+  <div class="graph">
+    <div class="node" data-agent="classify_intent">classify_intent</div>
+    <span class="arrow">→</span>
+    <div class="node" data-agent="supervisor">supervisor</div>
+    <span class="arrow">→</span>
+    <div class="node" data-agent="recommendation">recommendation</div>
+    <span class="arrow">→</span>
+    <div class="node" data-agent="negotiation">negotiation</div>
+    <span class="arrow">→</span>
+    <div class="node" data-agent="await_approval">await_approval</div>
+    <span class="arrow">→</span>
+    <div class="node" data-agent="apply_decision">apply_decision</div>
+    <span class="arrow">→</span>
+    <div class="node" data-agent="checkout">checkout</div>
+  </div>
+  <div class="graph" style="margin-top:0.75rem;">
+    <div class="node" data-agent="respond">respond</div>
+    <div class="node" data-agent="handoff">handoff</div>
+  </div>
+</div>
+<pre id="log"></pre>
+<script>
+  const nodes = {};
+  document.querySelectorAll(".node").forEach((el) => { nodes[el.dataset.agent] = el; });
+  const log = document.getElementById("log");
+  const source = new EventSource("/portal/live/stream");
+  source.onmessage = (event) => {
+    let payload;
+    try { payload = JSON.parse(event.data); } catch (e) { return; }
+    const node = nodes[payload.agent];
+    if (node) node.classList.toggle("active", payload.status === "started");
+    log.textContent = `${new Date().toLocaleTimeString()} ${payload.agent} ${payload.status}\n` + log.textContent;
+  };
+</script>
+{% endblock %}

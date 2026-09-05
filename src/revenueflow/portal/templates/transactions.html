@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %} — Transações{% endblock %}
+{% block content %}
+<h1 style="font-size:1.3rem;">Transações recentes</h1>
+<div class="card">
+{% if transactions %}
+<table>
+  <tr><th>Quote</th><th>Status</th><th>Total</th><th>Pedido</th><th>Pagamento</th><th>Criado em</th></tr>
+  {% for t in transactions %}
+  <tr>
+    <td><a href="/portal/conversations/{{ t.conversation_id }}">{{ t.quote_id }}</a></td>
+    <td><span class="pill">{{ t.quote_status }}</span></td>
+    <td>${{ "%.2f"|format(t.total|float) }}</td>
+    <td>{{ t.order_status or "—" }}</td>
+    <td>{{ t.payment_status or "—" }}</td>
+    <td>{{ t.created_at }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<p class="empty">Nenhuma transação ainda.</p>
+{% endif %}
+</div>
+{% endblock %}
