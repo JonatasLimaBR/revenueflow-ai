@@ -61,6 +61,7 @@ class Settings(BaseSettings):
     whatsapp_access_token: str = ""
 
     revenueflow_api_base_url: str = "http://localhost:8080"
+    mcp_api_token: str = ""
 
 
 @lru_cache
