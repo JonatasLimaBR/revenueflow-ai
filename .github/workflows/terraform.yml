@@ -66,6 +66,8 @@ jobs:
             -var "project_id=${{ vars.GCP_PROJECT_ID }}" \
             -var "region=${{ vars.GCP_REGION }}" \
             -var "image=${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/revenueflow/api:${{ github.sha }}" \
+            -var "alert_email=${{ vars.ALERT_EMAIL }}" \
+            -var 'dashboard_viewer_emails=${{ vars.DASHBOARD_VIEWER_EMAILS || '[]' }}' \
             | tee plan.txt
 
       - name: comment plan
@@ -121,7 +123,9 @@ jobs:
           terraform apply -auto-approve -input=false \
             -var "project_id=${{ vars.GCP_PROJECT_ID }}" \
             -var "region=${{ vars.GCP_REGION }}" \
-            -var "image=${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/revenueflow/api:${{ github.sha }}"
+            -var "image=${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/revenueflow/api:${{ github.sha }}" \
+            -var "alert_email=${{ vars.ALERT_EMAIL }}" \
+            -var 'dashboard_viewer_emails=${{ vars.DASHBOARD_VIEWER_EMAILS || '[]' }}'
 
       - name: publish landing page
         working-directory: ${{ env.WORKDIR }}
