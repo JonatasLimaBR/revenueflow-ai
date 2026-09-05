@@ -217,23 +217,29 @@ Fatias entregues, arquivadas em `.claude/sdd/archive/`:
   DNS fica fora do Terraform — apontar o registro A pro `landing_page_ip` é passo manual do
   usuário no provedor de DNS; o cert fica `PROVISIONING` até isso resolver.
 
-Deploy: o ambiente GCP está no ar (Cloud Run `revenueflow-api` + `revenueflow-mcp-readonly`, Cloud
-SQL, Pub/Sub, Cloud Run Jobs `revenueflow-api-migrate`, `revenueflow-opportunity-scan`,
-`revenueflow-campaign-run`, `revenueflow-analytics-sync` e `revenueflow-lead-sweep`) via
-`.github/workflows/terraform.yml` (ADR-048); schema + catálogo simulado aplicados. Landing page em
-`https://mastavista.com.br` uma vez que o DNS resolver (antes disso, `http://<landing_page_ip>`,
-output do Terraform, ADR-060/068). Pendências operacionais: apontar o registro A de
+Deploy: **auditoria em 2026-09-05 (ADR-069) achou que nenhum deploy real tinha rodado desde
+CUSTOMER_360 (2026-09-03)** — o ambiente GitHub `production` tem um gate de aprovação manual
+(`required_reviewers`) que ficou parado por 17 deploys seguidos sem ninguém aprovar, e quando
+finalmente aprovado o `apply` falhou de verdade por IAM faltando na service account de deploy
+(`deployer_roles` sem `logging.admin`/`monitoring.admin`/`compute.admin` — corrigido no bootstrap,
+mas o bootstrap é aplicado manualmente, fora da CI, ADR-048). Até esse bootstrap ser reaplicado à
+mão, o dashboard (ADR-056), os alertas, e os recursos de Load Balancer da landing page (ADR-060/068)
+não existem de fato no GCP, mesmo com o código/Terraform corretos há dias. `revenueflow-api` e o
+schema/catálogo simulado são o que se confirmou aplicado até CUSTOMER_360; tudo depois disso
+(Cloud Run `revenueflow-mcp-readonly`, os Jobs `revenueflow-opportunity-scan`/
+`revenueflow-campaign-run`/`revenueflow-analytics-sync`/`revenueflow-lead-sweep`, a landing page,
+o domínio `mastavista.com.br`) só fica confirmado depois do próximo deploy aprovado com sucesso.
+Pendências operacionais: reaplicar `infra/terraform/bootstrap/` manualmente (papéis de IAM novos,
+ADR-069), aprovar o próximo deploy no ambiente `production`, então: apontar o registro A de
 `mastavista.com.br` pro `landing_page_ip` e conferir `landing_page_cert_check` até `ACTIVE`,
 valores reais dos secrets do WhatsApp, registro do webhook no Meta,
 `gcloud run jobs execute revenueflow-api-migrate` para aplicar `0005`–`0014`, popular
 `consent_opt_in_at` de clientes reais antes de rodar `revenueflow-campaign-run` em produção,
 `gcloud run jobs execute revenueflow-analytics-sync` para o primeiro sync do BigQuery, preencher
 as GitHub Actions repo variables `ALERT_EMAIL`/`DASHBOARD_VIEWER_EMAILS` (`gh variable set` —
-`terraform.yml` já as encaminha pro `plan`/`apply`, `[]` se ausente; antes dessa correção elas
-nunca chegavam ao Terraform, por isso o dashboard ficava sem viewer nenhum apesar do ADR-065
-existir) — sem isso os alertas do Cloud Monitoring não notificam e o dashboard fica sem viewer, e
-distribuir o valor de `gcloud secrets versions access latest --secret=revenueflow-mcp-api-token` +
-`mcp_readonly_url` (output do Terraform) pra quem for usar o MCP público de leitura.
+`terraform.yml` já as encaminha pro `plan`/`apply`, `[]` se ausente), e distribuir o valor de
+`gcloud secrets versions access latest --secret=revenueflow-mcp-api-token` + `mcp_readonly_url`
+(output do Terraform) pra quem for usar o MCP público de leitura.
 
 O código de aplicação **existe** e não é mais scaffolding.
 
@@ -537,3 +543,4 @@ Claude deve localizar e ler os documentos relacionados antes de implementar.
 - [ADR-066 — CTA de WhatsApp na landing page: deep link wa.me, sem backend novo](docs/adrs/adr-066-whatsapp-cta-landing-page.md)
 - [ADR-067 — MCP público de leitura: novo Cloud Run service, Streamable HTTP, bearer compartilhado](docs/adrs/adr-067-public-readonly-mcp-server.md)
 - [ADR-068 — Domínio próprio da landing page: mastavista.com.br, cert gerenciado, redirect HTTP→HTTPS](docs/adrs/adr-068-custom-domain-landing-page.md)
+- [ADR-069 — Bootstrap: deployer_roles estava sem Logging/Monitoring/Compute admin](docs/adrs/adr-069-bootstrap-deployer-missing-iam-roles.md)

@@ -22,6 +22,13 @@ locals {
     "roles/serviceusage.serviceUsageAdmin",
     "roles/resourcemanager.projectIamAdmin",
     "roles/storage.admin",
+    # Added post-facto (2026-09-05): the first real `apply` since OBSERVABILITY_OPS
+    # (ADR-056) and LANDING_PAGE (ADR-060) revealed these were missing the whole
+    # time — every deploy since 2026-09-03 had been stuck on a GitHub environment
+    # approval gate, so the gap in this list was never exercised until now.
+    "roles/logging.admin",    # google_logging_metric (ADR-056)
+    "roles/monitoring.admin", # google_monitoring_dashboard/alert_policy (ADR-056)
+    "roles/compute.admin",    # global LB: address/url_map/proxy/forwarding_rule (ADR-060/068)
   ])
 }
 
