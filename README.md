@@ -1,8 +1,199 @@
-# RevenueFlow AI — Documentação de Produto e Arquitetura
+# RevenueFlow AI
 
-Estrutura pensada para uso direto em GitHub, Cursor, Claude Code ou Codex.
+**Um agente comercial B2B via WhatsApp que nunca decide preço, estoque ou pagamento sozinho.**
 
-## PRDs
+RevenueFlow AI atende, negocia, fecha pedido e reabre conversa por iniciativa própria — tudo sobre
+Cloud Run, Cloud SQL, Pub/Sub e Vertex AI/Gemini. O LLM interpreta a mensagem; um **Policy Engine
+determinístico** decide o que é permitido; a API executa. Essa não é uma frase de efeito — é a
+regra que todo código novo precisa respeitar antes de entrar em `main`.
+
+[![CI](https://github.com/JonatasLimaBR/revenueflow-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/JonatasLimaBR/revenueflow-ai/actions/workflows/ci.yml)
+[![Terraform](https://github.com/JonatasLimaBR/revenueflow-ai/actions/workflows/terraform.yml/badge.svg)](https://github.com/JonatasLimaBR/revenueflow-ai/actions/workflows/terraform.yml)
+![Python](https://img.shields.io/badge/python-3.12-blue)
+![Status](https://img.shields.io/badge/status-em%20produção%20(GCP)-brightgreen)
+
+---
+
+## Índice
+
+- [Por que este projeto existe](#por-que-este-projeto-existe)
+- [Funcionalidades](#funcionalidades)
+- [Arquitetura](#arquitetura)
+- [Stack tecnológico](#stack-tecnológico)
+- [Quick start](#quick-start)
+- [Estrutura do repositório](#estrutura-do-repositório)
+- [Status do projeto](#status-do-projeto)
+- [Documentação completa](#documentação-completa)
+- [Contribuindo](#contribuindo)
+
+## Por que este projeto existe
+
+A maioria dos "agentes de IA" comerciais coloca o modelo de linguagem no controle de decisões que
+custam dinheiro de verdade — desconto, estoque, pagamento. RevenueFlow AI parte do princípio
+oposto: **o LLM nunca é a fonte da verdade**. Ele interpreta a intenção do cliente e redige texto;
+toda decisão que move dinheiro passa por uma *policy* Python pura, determinística e testável sem
+nenhuma chamada de modelo. O que sai fora da alçada da policy pausa o fluxo e espera um humano —
+nunca uma inferência sobre "o que o modelo achou razoável".
+
+## Funcionalidades
+
+17 fatias entregues e em produção, cada uma passada pelo ciclo completo (Brainstorm → Define →
+Design → Build → Ship) e mergeada em `main` só depois de todos os checks de CI verdes.
+
+| Fase | Fatia | O que faz |
+|---|---|---|
+| **1. Atendimento & IA** | `WHATSAPP_INBOUND_SLICE` | Webhook autenticado por HMAC → Pub/Sub → grafo LangGraph classifica a intenção e monta uma resposta ancorada em catálogo/preço/estoque reais — nunca texto solto do modelo. |
+| | `WHATSAPP_INBOUND_VERTEX` | Classificação de intenção e resposta passam a chamar **Vertex AI Gemini** de verdade, keyless via ADC. Falha transitória vira retry; exaustão vira handoff fixo, nunca resposta inventada. |
+| **2. Negociação & Aprovação** | `PRICING_AND_NEGOTIATION` | Pricing Service determinístico calcula margem e alçada; desconto fora da política **pausa o grafo** (`interrupt()`) e cria uma `Approval(PENDING)`. |
+| | `APPROVAL_RESUME` | Rota interna autenticada transiciona a aprovação; o consumidor toma um *advisory lock* por conversa e retoma o grafo exatamente de onde parou. |
+| **3. Pedido & Pagamento** | `CHECKOUT` | Confirmação explícita cria o pedido de forma **idempotente**, revalida estoque na hora e roda pagamento em sandbox — zero dado de cartão, zero transação real. |
+| **4. Inteligência de Cliente** | `CUSTOMER_360` | Telefone é conferido contra a base de clientes antes de virar lead novo; cliente conhecido ganha uma visão comercial de 365 dias, sem dado bruto ir inteiro para o LLM. |
+| | `OPPORTUNITY_ENGINE` | Job em lote, fora do grafo, detecta recompra atrasada e proposta parada por regra pura — cada oportunidade carrega o motivo e a evidência numérica exata. |
+| | `LEAD_LIFECYCLE` | Status do lead avança por sinal determinístico (`NEW → QUALIFYING → QUALIFIED → PROPOSAL → WON`); `WON` promove um `Customer` real. Leads sem atividade viram `LOST` em lote. |
+| **5. Governança & Operação** | `HUMAN_HANDOFF` | 3 gatilhos determinísticos transferem a conversa — pedido explícito, baixa confiança, alto valor — cada um com precedência fixa. |
+| | `AUDIT_TRAIL` | Uma linha de auditoria por turno no próprio banco: agente, modelo, ferramentas, tokens, custo em USD, latência e resultado. |
+| | `OBSERVABILITY_OPS` | A auditoria vira log estruturado + métrica de produção: 5 alertas (5xx, p95, falha de ferramenta, custo/h, ausência de tráfego) num dashboard do Cloud Monitoring. |
+| | `HARDENING_PERFORMANCE` | Orçamento de tempo por turno: timeout por tentativa no Vertex AI, teto duro no turno inteiro, timeout por consulta no banco. |
+| | `HARDENING_SECURITY_PII` | CPF mascarado em todo log; headers de segurança em toda resposta HTTP; suíte que **prova** que uma mensagem adversária não muda alçada, preço, nem pula aprovação. |
+| | `DASHBOARD_ACCESS` | Acesso de leitura ao dashboard de observabilidade para outras contas Google, via IAM (`roles/monitoring.viewer`), sem abrir o projeto inteiro. |
+| **6. Venda Ativa** | `ACTIVE_SALES` | Job em lote roda um Policy Gate real (opt-out sempre vence, sem opt-in ninguém é contatado, limite de frequência) antes de enviar mensagem via WhatsApp. |
+| **7. Analytics & Acesso** | `ANALYTICS` | Revenue Intelligence: receita, margem, receita recuperada e custo de IA sincronizados do Postgres para o BigQuery. |
+| | `ANALYTICS_360` | Customer 360, Lead 360, Opportunity 360 e taxa de handoff — os domínios restantes do PRD-015 — no mesmo pipeline. |
+| | `MCP_SERVER` | Servidor MCP pessoal (leitura + as operações internas já existentes) para acessar o sistema via Claude Desktop/Claude Code. |
+
+Cada linha acima tem um ADR correspondente documentando o *porquê* — veja [Documentação
+completa](#documentação-completa).
+
+## Arquitetura
+
+### Fluxo de uma mensagem
+
+```mermaid
+flowchart LR
+    WA["Cliente<br/>WhatsApp"] -->|"POST /webhook<br/>HMAC verificado"| API["Cloud Run<br/>API"]
+    API -->|"message_received"| PS[("Pub/Sub")]
+    PS --> W["Worker<br/>(idempotente)"]
+    W --> G["Grafo LangGraph<br/>classify → supervisor → ..."]
+    G <-->|"checkpoint"| DB[("Cloud SQL<br/>PostgreSQL")]
+    G -->|"intent + resposta"| LLM["Vertex AI<br/>Gemini"]
+    G --> OUT["ChannelOutbound"]
+    OUT -->|"resposta / proposta / handoff"| WA
+```
+
+### Camadas de dependência
+
+```text
+api / agents / worker
+        ↓
+     services
+        ↓
+  domain + policies
+        ↓
+repositories / adapters
+```
+
+`agents` nunca acessa o banco diretamente; `policies` são funções puras, testáveis sem LLM e sem
+I/O. Ferramenta ausente é controle de segurança — um agente nunca vê uma `tool` que não deveria
+existir para ele (ver [SPEC-025](docs/specs/spec-025-tool-permissions.md)).
+
+### Invariantes (não-negociáveis)
+
+- **O LLM não é fonte de verdade** para preço, estoque, margem, identidade, pedido ou pagamento.
+- **Tool ausente é controle de segurança** — nunca registrar uma tool proibida "por garantia".
+- **Ação irreversível exige checkpoint/aprovação** quando definido em spec.
+- **Nunca pagamento real** e **nunca documento fiscal real** nesta versão — sandbox de ponta a ponta.
+- **Nenhum guardrail é removido** para fazer um CI passar.
+- **Todo turno é auditado** — agente, modelo, ferramentas, custo e resultado, uma linha, sempre.
+
+A lista completa está em [`CLAUDE.md`](CLAUDE.md#invariantes).
+
+## Stack tecnológico
+
+| Camada | Tecnologia | ADR |
+|---|---|---|
+| Runtime | Python 3.12, FastAPI, Uvicorn | [SPEC-037](docs/specs/spec-037-technology-stack.md) |
+| Orquestração de agentes | LangGraph (checkpoint em PostgreSQL) | [ADR-038](docs/adrs/adr-038-langgraph-for-stateful-agent-orchestration.md) |
+| LLM | Vertex AI / Gemini (`gemini-2.5-flash`), keyless via ADC | [ADR-049](docs/adrs/adr-049-vertex-ai-via-google-genai.md) |
+| OLTP | Cloud SQL (PostgreSQL) — sessão, pedido, aprovação, auditoria, checkpoint do grafo | [ADR-004](docs/adrs/adr-004-postgresql-como-oltp.md) |
+| Analytics | BigQuery (sync batch a partir do Postgres) | [ADR-005](docs/adrs/adr-005-bigquery-como-analytics.md) |
+| Backbone assíncrono | Pub/Sub | [ADR-006](docs/adrs/adr-006-pub-sub-como-event-backbone.md) |
+| Compute | Cloud Run (serviço + Jobs batch) | [ADR-002](docs/adrs/adr-002-cloud-run-como-runtime.md) |
+| IaC | Terraform, `plan` comentado em todo PR, `apply` só em `main` | — |
+| CD | GitHub Actions + Workload Identity Federation (keyless) | [ADR-048](docs/adrs/adr-048-github-actions-wif-keyless-cd.md) |
+| Observabilidade | Log-based metrics + OpenTelemetry → Cloud Trace | [ADR-056](docs/adrs/adr-056-observability-ops-otel-cloud-trace-and-log-metrics.md) |
+
+## Quick start
+
+Requisitos: Docker + Docker Compose, Python 3.12.
+
+```bash
+make up          # sobe app + postgres + emulador Pub/Sub + Langfuse (docker-compose)
+make migrate     # aplica migrations + setup do checkpointer LangGraph
+make seed        # popula o catálogo/estoque simulado
+make run         # roda a API local com autoreload (precisa de postgres)
+make check       # lint + typecheck + testes + validate_docs (tudo que o CI roda)
+```
+
+Por padrão o projeto roda em `LLM_STUB=1` (sem credencial de nuvem necessária) — dev local e CI
+usam o stub; produção roda `LLM_STUB=0` contra o Vertex AI real. Detalhes completos de deploy no
+[runbook de deploy](docs/engineering/deploy.md).
+
+## Estrutura do repositório
+
+```text
+revenueflow-ai/
+├── AGENTS.md               # contrato de engenharia compartilhado
+├── CLAUDE.md                # regras específicas do harness Claude Code
+├── CONTRIBUTING.md
+├── src/revenueflow/
+│   ├── api/                 # rotas FastAPI (webhook, approvals, handoffs, audit, health)
+│   ├── agents/               # nós do grafo LangGraph
+│   ├── services/             # orquestração de casos de uso
+│   ├── policies/             # regras determinísticas puras (sem I/O, sem LLM)
+│   ├── domain/                # enums + dataclasses de entidade
+│   ├── repositories/          # acesso a Postgres (pool async psycopg)
+│   ├── adapters/               # portas de canal (WhatsApp)
+│   ├── tools/                   # tools LangGraph, registries isolados por agente
+│   ├── events/                   # EventPublisher (in_memory/pubsub)
+│   ├── observability/             # mask() de PII, Tracer, custo, logging, OTel
+│   ├── worker/                     # consumidores Pub/Sub idempotentes
+│   └── config.py                    # Settings tipado (pydantic-settings)
+├── tests/
+│   ├── unit/ · integration/ · security/ · ai_eval/
+├── scripts/                 # entrypoints dos Cloud Run Jobs batch
+├── infra/terraform/         # toda a infraestrutura, versionada
+├── migrations/               # SQL sequencial, aplicado por scripts/migrate.py
+└── docs/
+    ├── prd/                  # 16 Product Requirement Docs
+    ├── specs/                # 37 especificações técnicas
+    ├── adrs/                 # 63 Architecture Decision Records
+    └── engineering/          # harness, estrutura, processo, deploy
+```
+
+## Status do projeto
+
+| Métrica | Valor |
+|---|---|
+| Fatias entregues | 17 (ver tabela de [Funcionalidades](#funcionalidades)) |
+| ADRs documentados | 63 |
+| PRDs | 16 |
+| SPECs | 37 |
+| Pagamento real | 0 — sandbox de ponta a ponta ([ADR-029](docs/adrs/adr-029-pagamento-somente-sandbox.md)) |
+| Decisão de preço fora do LLM | 100% ([ADR-011](docs/adrs/adr-011-pricing-determin-stico.md)) |
+| Deploy | Ativo no GCP (Cloud Run + Cloud SQL + Pub/Sub + BigQuery), CD automático via GitHub Actions |
+
+O estado detalhado — o que cada fatia fez, o que ficou fora de escopo deliberadamente, e as
+pendências operacionais restantes — vive em [`CLAUDE.md`](CLAUDE.md#estado-da-implementação), que é
+atualizado a cada fatia mergeada.
+
+## Documentação completa
+
+Cada decisão, especificação e requisito de produto tem um arquivo independente — facilita revisão
+por Pull Request, histórico Git, e implementação por agentes de código.
+
+<details>
+<summary><strong>PRDs — Product Requirement Docs (16)</strong></summary>
+
 - [PRD-001 — Visão e Objetivos do Produto](docs/prd/prd-001-vis-o-e-objetivos-do-produto.md)
 - [PRD-002 — Novo Cliente via WhatsApp](docs/prd/prd-002-novo-cliente-via-whatsapp.md)
 - [PRD-003 — Cliente Existente e Customer 360](docs/prd/prd-003-cliente-existente-e-customer-360.md)
@@ -20,7 +211,11 @@ Estrutura pensada para uso direto em GitHub, Cursor, Claude Code ou Codex.
 - [PRD-015 — Analytics e Revenue Intelligence](docs/prd/prd-015-analytics-e-revenue-intelligence.md)
 - [PRD-016 — Escopo e Critérios da V1](docs/prd/prd-016-escopo-e-crit-rios-da-v1.md)
 
-## SPECs
+</details>
+
+<details>
+<summary><strong>SPECs — Especificações Técnicas (37)</strong></summary>
+
 - [SPEC-001 — WhatsApp Webhook](docs/specs/spec-001-whatsapp-webhook.md)
 - [SPEC-002 — Conversation Session](docs/specs/spec-002-conversation-session.md)
 - [SPEC-003 — Identificação do Cliente](docs/specs/spec-003-identifica-o-do-cliente.md)
@@ -59,7 +254,11 @@ Estrutura pensada para uso direto em GitHub, Cursor, Claude Code ou Codex.
 - [SPEC-036 — Testing](docs/specs/spec-036-testing.md)
 - [SPEC-037 — Technology Stack](docs/specs/spec-037-technology-stack.md)
 
-## ADRs
+</details>
+
+<details>
+<summary><strong>ADRs — Architecture Decision Records (63)</strong></summary>
+
 - [ADR-001 — GCP como cloud principal](docs/adrs/adr-001-gcp-como-cloud-principal.md)
 - [ADR-002 — Cloud Run como runtime](docs/adrs/adr-002-cloud-run-como-runtime.md)
 - [ADR-003 — Monólito modular na V1](docs/adrs/adr-003-mon-lito-modular-na-v1.md)
@@ -103,67 +302,48 @@ Estrutura pensada para uso direto em GitHub, Cursor, Claude Code ou Codex.
 - [ADR-041 — Independent Spec Verification Ritual](docs/adrs/adr-041-independent-spec-verification-ritual.md)
 - [ADR-042 — Google Cloud CLI Remote MCP for Developer Harness](docs/adrs/adr-042-google-cloud-cli-remote-mcp-for-developer-harness.md)
 - [ADR-043 — Claude Code Hooks Block Destructive GCP Actions](docs/adrs/adr-043-claude-code-hooks-block-destructive-gcp-actions.md)
-- [ADR-044 — Pub/Sub para processamento assíncrono do webhook, atrás de uma porta EventPublisher](docs/adrs/adr-044-pub-sub-async-webhook-with-publisher-port.md)
+- [ADR-044 — Pub/Sub para processamento assíncrono do webhook](docs/adrs/adr-044-pub-sub-async-webhook-with-publisher-port.md)
 - [ADR-045 — Langfuse self-hosted atrás de uma porta Tracer](docs/adrs/adr-045-langfuse-self-hosted-behind-tracer-port.md)
 - [ADR-046 — Docker Compose e Makefile como harness de desenvolvimento](docs/adrs/adr-046-docker-compose-and-makefile-dev-harness.md)
-- [ADR-047 — Cloud Run consome o Pub/Sub por pull, com min_instances >= 1 na V1](docs/adrs/adr-047-cloud-run-consumes-pub-sub-by-pull-with-min-instance.md)
-- [ADR-048 — CD via GitHub Actions + Workload Identity Federation, sem chave](docs/adrs/adr-048-github-actions-wif-keyless-cd.md)
+- [ADR-047 — Cloud Run consome o Pub/Sub por pull](docs/adrs/adr-047-cloud-run-consumes-pub-sub-by-pull-with-min-instance.md)
+- [ADR-048 — CD via GitHub Actions + WIF, sem chave](docs/adrs/adr-048-github-actions-wif-keyless-cd.md)
+- [ADR-049 — Vertex AI via google-genai](docs/adrs/adr-049-vertex-ai-via-google-genai.md)
+- [ADR-050 — Retomada da aprovação via rota interna + evento Pub/Sub](docs/adrs/adr-050-approval-resume-via-internal-route-and-event.md)
+- [ADR-051 — Checkout Agent determinístico](docs/adrs/adr-051-checkout-agent-deterministic.md)
+- [ADR-052 — Customer 360: identidade determinística + visão comercial limitada](docs/adrs/adr-052-customer-360-identity-and-bounded-view.md)
+- [ADR-053 — Opportunity Engine determinístico](docs/adrs/adr-053-opportunity-engine-deterministic-batch.md)
+- [ADR-054 — Human Handoff: gatilhos determinísticos](docs/adrs/adr-054-human-handoff-deterministic-triggers-and-context.md)
+- [ADR-055 — Audit Trail: AuditTracer envolve o sink](docs/adrs/adr-055-audit-trail-tracer-sink-wrapper.md)
+- [ADR-056 — OBSERVABILITY_OPS: OTel → Cloud Trace + log-based metrics](docs/adrs/adr-056-observability-ops-otel-cloud-trace-and-log-metrics.md)
+- [ADR-057 — Orçamento de latência](docs/adrs/adr-057-latency-budget-per-dependency-timeout-and-turn-cap.md)
+- [ADR-058 — HARDENING_SECURITY_PII](docs/adrs/adr-058-security-pii-hardening-pass.md)
+- [ADR-059 — ACTIVE_SALES: Policy Gate de contato ativo](docs/adrs/adr-059-active-sales-outbound-policy-gate.md)
+- [ADR-060 — LANDING_PAGE: hosting estático GCS + Cloud CDN](docs/adrs/adr-060-landing-page-gcs-cdn.md)
+- [ADR-061 — ANALYTICS: sync batch Postgres → BigQuery](docs/adrs/adr-061-analytics-bigquery-revenue-cost.md)
+- [ADR-062 — LEAD_LIFECYCLE: transições determinísticas de status](docs/adrs/adr-062-lead-lifecycle-deterministic-transitions.md)
+- [ADR-063 — ANALYTICS_360: os 4 domínios restantes do PRD-015](docs/adrs/adr-063-analytics-360-remaining-prd015-domains.md)
 
-## Estrutura
+</details>
 
-```text
-revenueflow-ai-docs/
-├── README.md
-└── docs/
-    ├── prd/
-    │   ├── PRD-001 ...
-    │   └── PRD-016 ...
-    ├── specs/
-    │   ├── SPEC-001 ...
-    │   └── SPEC-037 ...
-    └── adrs/
-        ├── ADR-001 ...
-        └── ADR-046 ...
-```
+## Contribuindo
 
-## Convenção
-Cada decisão, especificação e requisito de produto possui um arquivo independente para facilitar:
-- revisão por Pull Request;
-- histórico Git;
-- linking entre documentos;
-- implementação por agentes de código;
-- rastreabilidade entre produto, arquitetura, testes e código.
+O harness oficial de engenharia é **Codex**, dirigido por [`AGENTS.md`](AGENTS.md). A `main` é
+protegida — mudanças entram só por Pull Request, com 7 checks obrigatórios (docs, lint, typecheck,
+tests, security, pre-commit, pr-title) e merge squash-only.
 
-## Agent Harness e Processo de Engenharia
-
-O harness oficial é **Codex**, dirigido por [`AGENTS.md`](AGENTS.md).
-
-Documentação adicional:
+- [Guia de contribuição](CONTRIBUTING.md)
 - [Agent Harness](docs/engineering/agent-harness.md)
 - [Estrutura do Repositório](docs/engineering/repository-structure.md)
 - [Processo Visível](docs/engineering/visible-process.md)
 - [Política de Revisão](docs/engineering/review-policy.md)
-- [Contributing](CONTRIBUTING.md)
-
-A `main` deve ser protegida, mudanças entram por Pull Request e o workflow de CI valida documentação, lint, tipos, testes e secrets.
-
-### Controles agentic adicionais
 - [Arquitetura Agentic](docs/engineering/agentic-architecture.md)
 - [Matriz de Permissões de Tools](docs/engineering/tool-permission-matrix.md)
 - [Deploy no GCP — Runbook](docs/engineering/deploy.md)
-- [Ritual `/verificar-spec`](.codex/commands/verificar-spec.md)
-- [Ritual `/verificar-risco`](.codex/commands/verificar-risco.md)
 
-## GCP + Claude Code Dev Kit
+### GCP + Claude Code Dev Kit
 
-Este repositório inclui um harness Claude Code completo para GCP:
-
-- [`CLAUDE.md`](CLAUDE.md)
-- [Guia do Dev Kit](GCP_CLAUDE_CODE_DEV_KIT.md)
-- `.mcp.json`
-- `.claude/skills/`
-- `.claude/agents/`
-- `.claude/commands/`
-- `.claude/hooks/`
-
-O MCP principal é o Google Cloud CLI remote MCP. Ações destrutivas são bloqueadas por hook e continuam sujeitas a IAM e aprovação humana.
+Este repositório também inclui um harness [Claude Code](https://claude.com/claude-code) completo
+para GCP — [`CLAUDE.md`](CLAUDE.md), [guia do Dev Kit](GCP_CLAUDE_CODE_DEV_KIT.md), `.mcp.json`,
+`.claude/skills/`, `.claude/agents/`, `.claude/commands/` e `.claude/hooks/`. O MCP principal é o
+Google Cloud CLI remote MCP; ações destrutivas são bloqueadas por hook e continuam sujeitas a IAM e
+aprovação humana.
