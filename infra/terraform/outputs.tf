@@ -33,8 +33,18 @@ output "artifact_registry_repo" {
 }
 
 output "landing_page_ip" {
-  description = "Static IP for the landing page (no domain yet: http://<this>/)"
+  description = "Static IP for the landing page — point var.landing_domain's A record here (ADR-068); http://<this>/ still works directly"
   value       = google_compute_global_address.landing.address
+}
+
+output "landing_page_domain" {
+  description = "Custom domain configured for the landing page, once its A record resolves here (ADR-068) — empty if var.landing_domain is unset"
+  value       = var.landing_domain
+}
+
+output "landing_page_cert_check" {
+  description = "gcloud command to check managed-cert provisioning status (ACTIVE once DNS resolves)"
+  value       = var.landing_domain != "" ? "gcloud compute ssl-certificates describe ${google_compute_managed_ssl_certificate.landing[0].name} --global --format='value(managed.status)'" : ""
 }
 
 output "landing_page_bucket" {

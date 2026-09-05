@@ -24,3 +24,8 @@ tracer_sink   = "otel"
 # Read-only Cloud Monitoring dashboard access for teammates (ADR-065). Empty =
 # no one but the project's existing IAM members can see the dashboard.
 # dashboard_viewer_emails = ["teammate1@example.com", "teammate2@example.com"]
+
+# Custom domain for the landing page (ADR-068). Empty = HTTP-only on the bare
+# static IP (ADR-060). After apply, point an A record at output
+# landing_page_ip; the managed cert stays PROVISIONING until that resolves.
+# landing_domain = "mastavista.com.br"

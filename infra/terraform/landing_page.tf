@@ -1,8 +1,7 @@
-# Static landing-page hosting: a public GCS bucket behind a global HTTP Load
-# Balancer with Cloud CDN enabled, so the site gets edge caching and a stable
-# static IP today. No custom domain yet (ADR-060) — HTTPS is deliberately out
-# of scope until one exists; adding it later is additive (a managed cert + an
-# HTTPS proxy pointed at the same backend), nothing here needs to be recreated.
+# Static landing-page hosting: a public GCS bucket behind a global HTTP(S)
+# Load Balancer with Cloud CDN enabled. Custom domain + managed TLS cert added
+# in ADR-068 (mastavista.com.br) — additive on top of ADR-060's HTTP-only
+# setup, exactly as that ADR anticipated: nothing here was recreated.
 resource "google_storage_bucket" "landing" {
   name                        = "${var.project_id}-landing"
   location                    = var.region
@@ -39,8 +38,10 @@ resource "google_compute_url_map" "landing" {
 }
 
 resource "google_compute_target_http_proxy" "landing" {
-  name    = "${var.service_name}-landing-proxy"
-  url_map = google_compute_url_map.landing.id
+  name = "${var.service_name}-landing-proxy"
+  # Redirects to HTTPS once var.landing_domain is set (ADR-068); serves the
+  # bucket directly over HTTP when it's empty (ADR-060's original behavior).
+  url_map = var.landing_domain != "" ? google_compute_url_map.landing_redirect[0].id : google_compute_url_map.landing.id
 }
 
 resource "google_compute_global_forwarding_rule" "landing" {
@@ -50,4 +51,53 @@ resource "google_compute_global_forwarding_rule" "landing" {
   port_range            = "80"
   target                = google_compute_target_http_proxy.landing.id
   load_balancing_scheme = "EXTERNAL"
+}
+
+# Custom domain + managed TLS (ADR-068). var.landing_domain empty (the
+# default for any other clone of this config) skips all of this — the
+# HTTP-only setup above stays exactly as ADR-060 left it. DNS itself is
+# outside Terraform: point an A record for var.landing_domain at
+# google_compute_global_address.landing.address (output landing_page_ip) —
+# the managed cert stays PROVISIONING until that resolves.
+resource "google_compute_managed_ssl_certificate" "landing" {
+  count = var.landing_domain != "" ? 1 : 0
+
+  name = "${var.service_name}-landing-cert"
+
+  managed {
+    domains = [var.landing_domain]
+  }
+}
+
+resource "google_compute_target_https_proxy" "landing" {
+  count = var.landing_domain != "" ? 1 : 0
+
+  name             = "${var.service_name}-landing-https-proxy"
+  url_map          = google_compute_url_map.landing.id
+  ssl_certificates = [google_compute_managed_ssl_certificate.landing[0].id]
+}
+
+resource "google_compute_global_forwarding_rule" "landing_https" {
+  count = var.landing_domain != "" ? 1 : 0
+
+  name                  = "${var.service_name}-landing-https-fr"
+  ip_address            = google_compute_global_address.landing.address
+  ip_protocol           = "TCP"
+  port_range            = "443"
+  target                = google_compute_target_https_proxy.landing[0].id
+  load_balancing_scheme = "EXTERNAL"
+}
+
+# HTTP now redirects to HTTPS instead of serving the bucket directly — the
+# existing target_http_proxy points at this redirect map, not at
+# google_compute_url_map.landing, once a domain is configured.
+resource "google_compute_url_map" "landing_redirect" {
+  count = var.landing_domain != "" ? 1 : 0
+
+  name = "${var.service_name}-landing-redirect-map"
+
+  default_url_redirect {
+    https_redirect = true
+    strip_query    = false
+  }
 }

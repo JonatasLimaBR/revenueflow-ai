@@ -135,11 +135,10 @@ Fatias entregues, arquivadas em `.claude/sdd/archive/`:
   `revenueflow-opportunity-scan`; Cloud Scheduler é follow-up). **Sem** WhatsApp Message
   Templates (HSM) reais, opt-in inbound, ou personalização por LLM na V1 (ADR-059).
 - **LANDING_PAGE** (2026-09-04, PR #53, ADR-060) — primeira fatia sem PRD/SPEC dedicado: um site estático
-  (`site/index.html` + `site/assets/styles.css`, sem framework/build step) detalhando as 13 fatias
+  (`site/index.html` + `site/assets/styles.css`, sem framework/build step) detalhando as fatias
   entregues (agrupadas em 6 fases) + arquitetura + roadmap, hospedado em GCS atrás de um Load
-  Balancer HTTP global com Cloud CDN (`infra/terraform/landing_page.tf`, 7 recursos) — **sem**
-  domínio próprio/HTTPS ainda (a URL pública é o IP estático do output `landing_page_ip`; upgrade
-  para domínio é aditivo). Deploy do conteúdo via `gsutil rsync` no job `deploy` de
+  Balancer HTTP global com Cloud CDN (`infra/terraform/landing_page.tf`, 7 recursos) — domínio
+  próprio/HTTPS vieram depois, aditivamente (ADR-068). Deploy do conteúdo via `gsutil rsync` no job `deploy` de
   `terraform.yml` (depois do `terraform apply`, com invalidação de cache CDN), não via
   `google_storage_bucket_object` — editar copy é um commit normal, sem `plan`/`apply`. CSP via
   `<meta http-equiv>` (cumpre a nota do ADR-058, já que GCS não roda servidor de app próprio).
@@ -193,12 +192,23 @@ Fatias entregues, arquivadas em `.claude/sdd/archive/`:
   mesmo Bearer). `mcp/tools.py` isola a lógica de negócio do pacote `mcp` — testável sem o extra
   instalado (`httpx.MockTransport` pras tools de ação). **Sem** servidor hospedado/multi-tenant,
   sem tool de escrita nova além das rotas já existentes (ADR-064).
+- **LANDING_PAGE_DOMAIN** (2026-09-05, ADR-068) — domínio próprio `mastavista.com.br` pra landing
+  page, fornecido e pedido explicitamente pelo usuário — extensão aditiva do ADR-060 (nenhum
+  recurso recriado). `google_compute_managed_ssl_certificate` escopado só ao domínio (sem `www`);
+  novo `google_compute_target_https_proxy` na porta 443, mesmo IP estático de sempre; o proxy HTTP
+  existente passa a redirecionar pra HTTPS (`google_compute_url_map` novo, `https_redirect =
+  true`) em vez de servir o bucket direto. Tudo condicionado a `var.landing_domain != ""`
+  (default = o domínio real; vazio desliga tudo e mantém o comportamento HTTP-only do ADR-060).
+  DNS fica fora do Terraform — apontar o registro A pro `landing_page_ip` é passo manual do
+  usuário no provedor de DNS; o cert fica `PROVISIONING` até isso resolver.
 
 Deploy: o ambiente GCP está no ar (Cloud Run `revenueflow-api`, Cloud SQL, Pub/Sub, Cloud Run
 Jobs `revenueflow-api-migrate`, `revenueflow-opportunity-scan`, `revenueflow-campaign-run`,
 `revenueflow-analytics-sync` e `revenueflow-lead-sweep`) via `.github/workflows/terraform.yml` (ADR-048); schema + catálogo
-simulado aplicados. Landing page em `http://<landing_page_ip>` (output do Terraform — sem domínio
-próprio ainda, ADR-060). Pendências operacionais: valores reais dos secrets do WhatsApp, registro
+simulado aplicados. Landing page em `https://mastavista.com.br` uma vez que o DNS resolver (antes
+disso, `http://<landing_page_ip>`, output do Terraform, ADR-060/068). Pendências operacionais:
+apontar o registro A de `mastavista.com.br` pro `landing_page_ip` e conferir `landing_page_cert_check`
+até `ACTIVE`, valores reais dos secrets do WhatsApp, registro
 do webhook no Meta, `gcloud run jobs execute revenueflow-api-migrate` para aplicar `0005`–`0014`,
 popular `consent_opt_in_at` de clientes reais antes de rodar `revenueflow-campaign-run` em
 produção, `gcloud run jobs execute revenueflow-analytics-sync` para o primeiro sync do BigQuery,
@@ -504,3 +514,4 @@ Claude deve localizar e ler os documentos relacionados antes de implementar.
 - [ADR-063 — ANALYTICS_360: os 4 domínios restantes do PRD-015](docs/adrs/adr-063-analytics-360-remaining-prd015-domains.md)
 - [ADR-064 — Servidor MCP pessoal: leitura + operações internas já existentes, stdio](docs/adrs/adr-064-personal-mcp-server-read-and-internal-ops.md)
 - [ADR-065 — Acesso de leitura ao dashboard: roles/monitoring.viewer por e-mail](docs/adrs/adr-065-dashboard-viewer-access-monitoring-viewer.md)
+- [ADR-068 — Domínio próprio da landing page: mastavista.com.br, cert gerenciado, redirect HTTP→HTTPS](docs/adrs/adr-068-custom-domain-landing-page.md)
