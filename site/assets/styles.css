@@ -12,6 +12,7 @@
   --accent-strong: #24c197;
   --accent-soft: rgba(53, 208, 168, 0.12);
   --gold: #d9b26a;
+  --gold-strong: #c49a52;
   --danger: #e2836f;
   --radius-lg: 18px;
   --radius-md: 12px;
@@ -277,6 +278,17 @@ code {
 .btn--ghost:focus-visible {
   border-color: var(--accent);
   color: var(--accent);
+}
+
+.btn--whatsapp {
+  background: var(--gold);
+  color: #241a08;
+}
+
+.btn--whatsapp:hover,
+.btn--whatsapp:focus-visible {
+  background: var(--gold-strong);
+  transform: translateY(-2px);
 }
 
 .stats {
