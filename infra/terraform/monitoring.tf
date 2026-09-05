@@ -32,28 +32,6 @@ resource "google_logging_metric" "turn_cost_usd" {
   depends_on = [google_project_service.this]
 }
 
-# Plain-numeric sibling of turn_cost_usd, for the ai_cost_per_hour alert only
-# (found live in production, ADR-071): Cloud Monitoring's ALIGN_SUM does not
-# reduce a DISTRIBUTION metric to a scalar (only percentile aligners do,
-# which would change the alert from "total $/hour" to "one turn's
-# percentile") — a second, non-distribution metric is the correct fix, not a
-# different aligner on the histogram metric the dashboard already depends on.
-resource "google_logging_metric" "turn_cost_usd_total" {
-  name        = "revenueflow_turn_cost_usd_total"
-  description = "Per-turn AI cost in USD, plain numeric for ALIGN_SUM alerting (audit.turn)"
-  filter      = local.turn_filter
-
-  metric_descriptor {
-    metric_kind = "DELTA"
-    value_type  = "DOUBLE"
-    unit        = "1"
-  }
-
-  value_extractor = "EXTRACT(jsonPayload.cost_usd)"
-
-  depends_on = [google_project_service.this]
-}
-
 resource "google_logging_metric" "turn_latency_ms" {
   name        = "revenueflow_turn_latency_ms"
   description = "Per-turn latency in ms (audit.turn)"
@@ -134,23 +112,6 @@ resource "google_logging_metric" "tool_failures" {
       offset             = 0
     }
   }
-
-  depends_on = [google_project_service.this]
-}
-
-# Plain-numeric sibling of tool_failures, same reason as turn_cost_usd_total
-# above (ADR-071) — the tool_failures alert needs ALIGN_SUM to work.
-resource "google_logging_metric" "tool_failures_total" {
-  name        = "revenueflow_tool_failures_total"
-  description = "Unhandled tool exceptions per turn, plain numeric for ALIGN_SUM alerting (audit.turn)"
-  filter      = local.turn_filter
-
-  metric_descriptor {
-    metric_kind = "DELTA"
-    value_type  = "INT64"
-  }
-
-  value_extractor = "EXTRACT(jsonPayload.tool_failures)"
 
   depends_on = [google_project_service.this]
 }
@@ -261,18 +222,24 @@ resource "google_monitoring_alert_policy" "tool_failures" {
   combiner     = "OR"
 
   conditions {
-    display_name = "tool exceptions over ${var.alert_tool_failures_per_hour} / hour"
+    display_name = "p99 tool exceptions per turn over ${var.alert_tool_failures_per_hour}"
 
     condition_threshold {
-      filter = "metric.type=\"logging.googleapis.com/user/revenueflow_tool_failures_total\" AND resource.type=\"cloud_run_revision\""
+      filter = "metric.type=\"logging.googleapis.com/user/revenueflow_tool_failures\" AND resource.type=\"cloud_run_revision\""
 
       comparison      = "COMPARISON_GT"
       threshold_value = var.alert_tool_failures_per_hour
       duration        = "0s"
 
+      # revenueflow_tool_failures is DISTRIBUTION (dashboard needs the
+      # histogram) — ALIGN_SUM doesn't reduce a distribution to a scalar
+      # (confirmed against the Cloud Monitoring API docs, ADR-071/072); only
+      # percentile aligners do. This changes the alert's meaning from "total
+      # failures in the hour" to "the worst turn's failure count in the
+      # hour" — an imperfect but real, buildable proxy.
       aggregations {
         alignment_period   = "3600s"
-        per_series_aligner = "ALIGN_SUM"
+        per_series_aligner = "ALIGN_PERCENTILE_99"
       }
     }
   }
@@ -280,13 +247,11 @@ resource "google_monitoring_alert_policy" "tool_failures" {
   notification_channels = local.alert_channels
 
   documentation {
-    content   = "More than ${var.alert_tool_failures_per_hour} unhandled tool exceptions in an hour. Inspect audit_event.events for the failing tool spans."
+    content   = "p99 tool exceptions per turn above ${var.alert_tool_failures_per_hour} in the last hour (proxy for total failures, ADR-072 — ALIGN_SUM isn't valid on a DISTRIBUTION metric). Inspect audit_event.events for the failing tool spans."
     mime_type = "text/markdown"
   }
 
-  # Explicit — the filter above references the metric by name (a string),
-  # not by resource attribute, so Terraform has no implicit dependency edge.
-  depends_on = [google_project_service.this, google_logging_metric.tool_failures_total]
+  depends_on = [google_project_service.this]
 }
 
 resource "google_monitoring_alert_policy" "ai_cost_per_hour" {
@@ -294,18 +259,23 @@ resource "google_monitoring_alert_policy" "ai_cost_per_hour" {
   combiner     = "OR"
 
   conditions {
-    display_name = "AI cost over $${var.alert_ai_cost_per_hour_usd} / hour"
+    display_name = "p99 per-turn AI cost over $${var.alert_ai_cost_per_hour_usd}"
 
     condition_threshold {
-      filter = "metric.type=\"logging.googleapis.com/user/revenueflow_turn_cost_usd_total\" AND resource.type=\"cloud_run_revision\""
+      filter = "metric.type=\"logging.googleapis.com/user/revenueflow_turn_cost_usd\" AND resource.type=\"cloud_run_revision\""
 
       comparison      = "COMPARISON_GT"
       threshold_value = var.alert_ai_cost_per_hour_usd
       duration        = "0s"
 
+      # revenueflow_turn_cost_usd is DISTRIBUTION (dashboard needs the
+      # histogram) — same constraint as tool_failures above (ADR-071/072):
+      # ALIGN_SUM doesn't scalarize a distribution, only percentile aligners
+      # do. This alerts on the priciest turn's cost in the hour, not literal
+      # total spend — a real, buildable proxy for "AI spend spiking".
       aggregations {
         alignment_period   = "3600s"
-        per_series_aligner = "ALIGN_SUM"
+        per_series_aligner = "ALIGN_PERCENTILE_99"
       }
     }
   }
@@ -313,12 +283,11 @@ resource "google_monitoring_alert_policy" "ai_cost_per_hour" {
   notification_channels = local.alert_channels
 
   documentation {
-    content   = "AI spend above $${var.alert_ai_cost_per_hour_usd}/hour. Check v_ai_cost_per_conversation and MODEL_PRICES."
+    content   = "p99 per-turn AI cost above $${var.alert_ai_cost_per_hour_usd} in the last hour (proxy for total spend, ADR-072 — ALIGN_SUM isn't valid on a DISTRIBUTION metric). Check v_ai_cost_per_conversation and MODEL_PRICES."
     mime_type = "text/markdown"
   }
 
-  # Explicit — same reason as tool_failures above.
-  depends_on = [google_project_service.this, google_logging_metric.turn_cost_usd_total]
+  depends_on = [google_project_service.this]
 }
 
 resource "google_monitoring_alert_policy" "no_turns" {

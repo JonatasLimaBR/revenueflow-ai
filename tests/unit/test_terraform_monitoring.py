@@ -5,12 +5,10 @@ _TF = Path(__file__).resolve().parents[2] / "infra" / "terraform"
 
 _LOG_METRICS = {
     "revenueflow_turn_cost_usd",
-    "revenueflow_turn_cost_usd_total",
     "revenueflow_turn_latency_ms",
     "revenueflow_turns",
     "revenueflow_handoffs",
     "revenueflow_tool_failures",
-    "revenueflow_tool_failures_total",
 }
 
 
@@ -23,21 +21,25 @@ def test_monitoring_tf_declares_all_log_metrics() -> None:
     assert "condition_absent" in body
 
 
-def test_sum_alerts_use_scalar_metrics_not_distributions() -> None:
-    # ADR-071: ALIGN_SUM on a DISTRIBUTION-typed log metric doesn't reduce to
-    # a scalar in Cloud Monitoring's API — the tool_failures/ai_cost_per_hour
-    # alerts must filter on the plain-numeric "_total" sibling metrics, not
-    # the histogram ones the dashboard uses.
+def test_distribution_alerts_use_percentile_not_sum() -> None:
+    # ADR-072 (corrects ADR-071): ALIGN_SUM never scalarizes a DISTRIBUTION
+    # log metric, and value_extractor is only legal on DISTRIBUTION metrics —
+    # so a plain-numeric sibling metric isn't buildable either. The
+    # tool_failures/ai_cost_per_hour alerts stay on the original histogram
+    # metrics (the dashboard needs them) but must use a percentile aligner,
+    # never ALIGN_SUM, to produce a comparable scalar.
     body = (_TF / "monitoring.tf").read_text()
     tool_failures_block = body.split(
         'resource "google_monitoring_alert_policy" "tool_failures"', 1
     )[1].split("\nresource ", 1)[0]
-    assert "revenueflow_tool_failures_total" in tool_failures_block
+    assert 'per_series_aligner = "ALIGN_PERCENTILE_99"' in tool_failures_block
+    assert 'per_series_aligner = "ALIGN_SUM"' not in tool_failures_block
 
     cost_block = body.split('resource "google_monitoring_alert_policy" "ai_cost_per_hour"', 1)[
         1
     ].split("\nresource ", 1)[0]
-    assert "revenueflow_turn_cost_usd_total" in cost_block
+    assert 'per_series_aligner = "ALIGN_PERCENTILE_99"' in cost_block
+    assert 'per_series_aligner = "ALIGN_SUM"' not in cost_block
 
 
 def test_alert_email_variable_has_a_default() -> None:
