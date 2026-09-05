@@ -217,20 +217,22 @@ Fatias entregues, arquivadas em `.claude/sdd/archive/`:
   DNS fica fora do Terraform — apontar o registro A pro `landing_page_ip` é passo manual do
   usuário no provedor de DNS; o cert fica `PROVISIONING` até isso resolver.
 
-Deploy: **auditoria em 2026-09-05 (ADR-069/070/071) achou que nenhum deploy real tinha rodado desde
+Deploy: **auditoria em 2026-09-05 (ADR-069 a 072) achou que nenhum deploy real tinha rodado desde
 CUSTOMER_360 (2026-09-03)** — o ambiente GitHub `production` tem um gate de aprovação manual
 (`required_reviewers`) que ficou parado por 17 deploys seguidos sem ninguém aprovar. Quando
 finalmente aprovado, o `apply` revelou, em camadas sucessivas (cada uma só aparecia depois da
 anterior ser corrigida): `deployer_roles` sem `logging.admin`/`monitoring.admin`/`compute.admin`/
-`bigquery.admin` (ADR-069/070, corrigido e **já reaplicado manualmente no bootstrap** —
-`infra/terraform/bootstrap/`, fora da CI, ADR-048); o pacote `mcp` v2.x quebrando
-`revenueflow-mcp-readonly` por renomear `FastMCP`→`MCPServer` (ADR-070, `pyproject.toml` fixado em
-`mcp>=1.9,<2`); e `ALIGN_SUM` não escalariza métrica `DISTRIBUTION` nos 2 alertas de custo/falha de
-ferramenta (ADR-071, métricas gêmeas `_total` criadas pro alerta, histograma original preservado
-pro dashboard). Depois do bootstrap reaplicado, um `apply` real criou a maior parte da
-infraestrutura (Load Balancer da landing page, BigQuery, Cloud Run `revenueflow-mcp-readonly`) —
-confirmar o estado atual exato exige rodar o deploy mais uma vez depois do fix do ADR-071 (imagem
-Docker também precisa rebuildar pra pegar o `mcp<2`). Pendências operacionais: aprovar/rodar o
+`bigquery.admin` (ADR-069/070, corrigido e **já reaplicado manualmente no bootstrap**, confirmado
+via `gcloud`); o pacote `mcp` v2.x quebrando `revenueflow-mcp-readonly` por renomear
+`FastMCP`→`MCPServer` (ADR-070, `pyproject.toml` fixado em `mcp>=1.9,<2`, **já confirmado
+funcionando em produção**); e `ALIGN_SUM` não escalariza métrica `DISTRIBUTION` nos 2 alertas de
+custo/falha de ferramenta — tentativa 1 (ADR-071, métrica gêmea sem `bucket_options`) também falhou
+porque `value_extractor` só é legal em métrica `DISTRIBUTION`; corrigido de vez no ADR-072
+(`ALIGN_PERCENTILE_99` nas métricas originais, mudando a semântica do alerta pra "pico por turno"
+em vez de "total na hora", documentado nos próprios alertas). Um `apply` real já criou a maior
+parte da infraestrutura (Load Balancer da landing page, BigQuery, Cloud Run
+`revenueflow-mcp-readonly` rodando com sucesso) — só os 2 alertas de custo/falha de ferramenta
+ficaram pendentes de confirmação depois do fix do ADR-072. Pendências operacionais: aprovar/rodar o
 próximo deploy no ambiente `production` até fechar sem erro, então: apontar o registro A de
 `mastavista.com.br` pro `landing_page_ip` e conferir `landing_page_cert_check` até `ACTIVE`,
 valores reais dos secrets do WhatsApp, registro do webhook no Meta,
@@ -547,3 +549,4 @@ Claude deve localizar e ler os documentos relacionados antes de implementar.
 - [ADR-069 — Bootstrap: deployer_roles estava sem Logging/Monitoring/Compute admin](docs/adrs/adr-069-bootstrap-deployer-missing-iam-roles.md)
 - [ADR-070 — Segunda rodada de correções do deploy: IAM do BigQuery + pin da versão do mcp](docs/adrs/adr-070-bigquery-iam-and-mcp-version-pin.md)
 - [ADR-071 — ALIGN_SUM não escalariza métrica DISTRIBUTION: métricas gêmeas pra alerta](docs/adrs/adr-071-distribution-metric-alert-sum-fix.md)
+- [ADR-072 — Correção do ADR-071: value_extractor só existe pra métrica DISTRIBUTION](docs/adrs/adr-072-value-extractor-requires-distribution.md)
