@@ -144,10 +144,7 @@ Fatias entregues, arquivadas em `.claude/sdd/archive/`:
   `google_storage_bucket_object` — editar copy é um commit normal, sem `plan`/`apply`. CSP via
   `<meta http-equiv>` (cumpre a nota do ADR-058, já que GCS não roda servidor de app próprio).
   Zero código Python tocado; zero coleta de dado (sem formulário/analytics).
-
-Em revisão:
-
-- **ANALYTICS** (2026-09-04, ADR-061) — fecha o domínio Revenue + Custo de IA do PRD-015 (dos 5
+- **ANALYTICS** (2026-09-04, PR #55, ADR-061) — fecha o domínio Revenue + Custo de IA do PRD-015 (dos 5
   domínios, só este entra nesta fatia). Nova view `v_conversation_revenue` (`0013`, ao lado das 3
   views de custo/receita já existentes — nenhuma delas é tocada) calcula, por conversa, `margin_usd`
   (receita menos custo dos itens via `sim_product.unit_cost`) e `recovered_revenue_usd` (pedidos
@@ -167,7 +164,8 @@ simulado aplicados. Landing page em `http://<landing_page_ip>` (output do Terraf
 próprio ainda, ADR-060). Pendências operacionais: valores reais dos secrets do WhatsApp, registro
 do webhook no Meta, `gcloud run jobs execute revenueflow-api-migrate` para aplicar `0005`–`0013`,
 popular `consent_opt_in_at` de clientes reais antes de rodar `revenueflow-campaign-run` em
-produção, e preencher `alert_email` no tfvars para os alertas do Cloud Monitoring notificarem.
+produção, `gcloud run jobs execute revenueflow-analytics-sync` para o primeiro sync do BigQuery, e
+preencher `alert_email` no tfvars para os alertas do Cloud Monitoring notificarem.
 
 O código de aplicação **existe** e não é mais scaffolding.
 
