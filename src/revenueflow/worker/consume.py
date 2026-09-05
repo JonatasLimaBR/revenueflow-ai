@@ -29,7 +29,7 @@ from revenueflow.repositories import customer as customer_repo
 from revenueflow.repositories import dispatch, processed_event
 from revenueflow.repositories import session as session_repo
 from revenueflow.repositories.db import execute, unit_of_work
-from revenueflow.services import get_or_create, record_turn, resolve
+from revenueflow.services import get_or_create, lead_lifecycle, record_turn, resolve
 
 _HELD_FOR_APPROVAL = (
     "Sua solicitacao anterior ainda esta em analise; retornamos assim que aprovada."
@@ -164,6 +164,11 @@ async def process_event(
             session.conversation_id,
             intent=Intent(result["intent"]),
             agent=result.get("current_agent"),
+        )
+        await lead_lifecycle.advance_from_turn(
+            lead_id=lead_id,
+            intent=str(result["intent"]),
+            final_outcome=result.get("final_outcome"),
         )
         await _send_once(session.conversation_id, envelope.event_id, phone, reply, outbound)
         get_tracer().end(outcome=str(result.get("final_outcome", "replied")))
