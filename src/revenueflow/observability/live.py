@@ -41,7 +41,12 @@ async def _notify(*, conversation_id: str, agent: str, status: str) -> None:
         {"conversation_id": conversation_id, "agent": agent, "status": status, "ts": time.time()}
     )
     try:
-        async with get_pool().connection() as conn:
+        # NOTIFY only reaches listeners once its transaction commits — a bare
+        # pool connection (no explicit transaction) leaves it uncommitted,
+        # rolled back on release, and silently never delivered. conn.transaction()
+        # commits on clean exit (confirmed missing by a real CI failure: the
+        # listener never received a payload, not a timeout from elsewhere).
+        async with get_pool().connection() as conn, conn.transaction():
             await conn.execute("SELECT pg_notify(%s, %s)", (_CHANNEL, payload))
     except Exception:
         _LOGGER.warning("live agent-activity notify failed", exc_info=True)
@@ -60,6 +65,12 @@ async def listen() -> AsyncIterator[str]:
     long-lived LISTEN from competing with the pool used for turn processing.
     """
     async with await psycopg.AsyncConnection.connect(get_settings().database_url) as conn:
+        # Required: without autocommit, LISTEN leaves the connection
+        # idle-in-transaction, and psycopg does not surface async NOTIFY
+        # payloads while a transaction is open (confirmed by a real,
+        # reproducible local failure — LISTEN registered, matching NOTIFYs
+        # committed on the sender's side, never received here without this).
+        await conn.set_autocommit(True)
         await conn.execute(f"LISTEN {_CHANNEL}")
         async for notify in conn.notifies():
             yield notify.payload

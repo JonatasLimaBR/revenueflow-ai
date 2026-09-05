@@ -22,11 +22,23 @@ async def test_notify_and_listen_round_trip(db: None) -> None:
         raise AssertionError("listen() ended without yielding a payload")
 
     listener_task = asyncio.ensure_future(_collect_one())
-    await asyncio.sleep(0.2)  # let LISTEN attach before we NOTIFY
 
-    live.notify_agent_start(conversation_id="conv-live-test", agent="recommendation")
+    # listen()'s connect() + LISTEN round-trip has real, variable latency (a
+    # fresh connection per call — confirmed by a real failure locally and in
+    # CI with a single fixed sleep before firing once). Retrying the notify
+    # is safe (each is an independent, idempotent-for-this-purpose event) and
+    # makes the test robust to that latency instead of guessing a bigger
+    # magic number.
+    async def _notify_until_received() -> None:
+        while not listener_task.done():
+            live.notify_agent_start(conversation_id="conv-live-test", agent="recommendation")
+            await asyncio.sleep(0.3)
 
-    payload = await asyncio.wait_for(listener_task, timeout=5.0)
+    notifier_task = asyncio.ensure_future(_notify_until_received())
+    try:
+        payload = await asyncio.wait_for(listener_task, timeout=5.0)
+    finally:
+        notifier_task.cancel()
     data = json.loads(payload)
     assert data["conversation_id"] == "conv-live-test"
     assert data["agent"] == "recommendation"
