@@ -58,6 +58,8 @@ class Settings(BaseSettings):
     whatsapp_phone_number_id: str = ""
     whatsapp_access_token: str = ""
 
+    revenueflow_api_base_url: str = "http://localhost:8080"
+
 
 @lru_cache
 def get_settings() -> Settings:

@@ -170,6 +170,13 @@ Fatias entregues, arquivadas em `.claude/sdd/archive/`:
   += 4 tabelas de fato + 3 views (`v_lead_conversion`/`v_opportunity_pipeline`/`v_opportunity_conversion`),
   mesmo dataset e IAM já escopados — nenhum recurso de IAM novo. **Sem** dashboard/Looker Studio,
   sem histórico de tendência, sem Cloud Scheduler (ADR-063).
+- **MCP_SERVER** (2026-09-05, ADR-064) — servidor MCP pessoal (`src/revenueflow/mcp/`, extra
+  `mcp`, stdio) pro usuário acessar o sistema via Claude Desktop/Claude Code. 6 tools de leitura
+  chamam `repositories.analytics` direto (mesmo padrão dos batch jobs); 5 tools de ação chamam as
+  rotas HTTP internas já deployadas (`/internal/approvals`/`/internal/handoffs`/`/internal/audit`,
+  mesmo Bearer). `mcp/tools.py` isola a lógica de negócio do pacote `mcp` — testável sem o extra
+  instalado (`httpx.MockTransport` pras tools de ação). **Sem** servidor hospedado/multi-tenant,
+  sem tool de escrita nova além das rotas já existentes (ADR-064).
 
 Deploy: o ambiente GCP está no ar (Cloud Run `revenueflow-api`, Cloud SQL, Pub/Sub, Cloud Run
 Jobs `revenueflow-api-migrate`, `revenueflow-opportunity-scan`, `revenueflow-campaign-run` e
@@ -199,7 +206,7 @@ Mapa de `src/revenueflow/`:
 
 | Pacote | Papel |
 |---|---|
-| `config` | `Settings` tipado (pydantic-settings) + flags `CHANNEL_OUTBOUND`/`TRACER_SINK`/`LLM_STUB`; `google_cloud_project`/`vertex_location`/`llm_max_retries`; `log_level`/`otel_service_name`; `llm_call_timeout_s`/`db_statement_timeout_ms`/`turn_budget_s`; `bigquery_dataset` |
+| `config` | `Settings` tipado (pydantic-settings) + flags `CHANNEL_OUTBOUND`/`TRACER_SINK`/`LLM_STUB`; `google_cloud_project`/`vertex_location`/`llm_max_retries`; `log_level`/`otel_service_name`; `llm_call_timeout_s`/`db_statement_timeout_ms`/`turn_budget_s`; `bigquery_dataset`; `revenueflow_api_base_url` |
 | `domain` | erros tipados; enums `SessionStatus` (+`HUMAN_HANDOFF`)/`LeadStatus`/`Intent`/`ApprovalStatus`/`QuoteStatus`/`OrderStatus`/`PaymentStatus`/`OpportunityType`/`OpportunityStatus`/`HandoffReason`/`HandoffStatus`; dataclasses de entidade (`Quote`/`Order`/`Payment`/`Customer`/`Opportunity`/`Handoff` incl.) |
 | `observability` | `mask()` de PII (email/CPF/phone + `extra_terms`, ADR-058); porta `Tracer` (`noop`/`langfuse`/`otel` + `AuditTracer` que envolve o sink, grava `audit_event` e emite a linha `audit.turn` por turno via `flush()`); `cost_usd()` (`MODEL_PRICES` do Vertex); `logging_setup` (`JsonFormatter` stdlib + `configure_logging`); `otel_setup` (`configure_otel` — `TracerProvider` + Cloud Trace exporter, ADR-056) |
 | `events` | `EventEnvelope`; porta `EventPublisher` (`in_memory`/`pubsub`) |
@@ -209,6 +216,7 @@ Mapa de `src/revenueflow/`:
 | `services` | `ingest`, `session` (+`phone_for`), `identity` (`customer` antes do `lead`), `prompts` (v2), `llm` (stub + Vertex real), `intent`, `respond`, `pricing`, `negotiation`, `approval`, `checkout` (`is_explicit_confirmation` + `quote_from_state` + `confirm`), `opportunity` (`scan()` — batch, fora do grafo), `handoff` (`build_context` SPEC-027 + `create`/`list_pending`/`resolve`), `audit` (`persist` falha-isolada + `reconstruct`), `campaign` (`run()` — batch, Policy Gate + envio, fora do grafo), `analytics_sync` (`run()` — batch, 6 cargas via `_SOURCES`, sync BigQuery `WRITE_TRUNCATE`, fora do grafo) |
 | `tools` | `RECOMMENDATION_TOOLS` (5 read-only, incl. `get_customer_360`) + `NEGOTIATION_TOOLS` (3 de pricing) + `CHECKOUT_TOOLS` (`create_quote`/`create_order`/`create_payment_sandbox`, determinísticas, registry isolado) + `registry` (fronteira — nenhum `set_discount`) |
 | `agents` | `TurnState`; `recommendation_node` (anexa `get_customer_360` p/ cliente conhecido); `negotiation_node` (+check `high_value_order`) + `await_approval_node` + `apply_decision_node` (ADR-050); `checkout_node` (quote/confirmação/order/payment, ADR-051); `handoff.py` (`to_handoff` + `handoff_node` que persiste + marca `HUMAN_HANDOFF`, ADR-054); `build_graph` |
+| `mcp` | Servidor MCP pessoal (ADR-064, extra opcional `mcp`, stdio): `tools.py` (leitura via `repositories.analytics` + ação via `httpx` nas rotas `/internal/*`, sem depender do pacote `mcp`) + `server.py` (encaixe fino `@mcp.tool()`) |
 | `api` | `webhook` (GET verify + POST 202), `health` (`/healthz`), `approvals` (`/internal/approvals`, Bearer), `handoffs` (`/internal/handoffs`, Bearer), `audit` (`/internal/audit/{conversation_id}`, Bearer). `main.py` tem um `@app.middleware("http")` de headers de segurança (ADR-058) |
 | `worker` | `process_event` (+ guard de opt-out inbound antes do grafo) + `process_approval_decided` (consumidores idempotentes), `subscriber` (loop Pub/Sub, roteia por `event_type`) |
 
@@ -271,6 +279,20 @@ Endpoint:
 - `https://cloudcli.googleapis.com/mcp`
 
 O MCP deve operar com a identidade autenticada do usuário e nunca contornar IAM.
+
+### Servidor MCP pessoal do RevenueFlow (ADR-064)
+
+`src/revenueflow/mcp/` (extra opcional `mcp`, `pip install -e ".[mcp]"`) expõe o próprio sistema
+via stdio para o usuário (Claude Desktop/Claude Code), não para uso de terceiros. Tools de leitura
+(`get_revenue_summary`/`list_customer_360`/`get_customer_360`/`list_lead_funnel`/
+`list_opportunities`/`get_handoff_rate`) leem `repositories.analytics` direto do Postgres, mesmo
+padrão dos batch jobs. Tools de ação (`list_pending_approvals`/`decide_approval`/
+`list_pending_handoffs`/`resolve_handoff`/`get_audit_trail`) chamam as rotas HTTP internas já
+deployadas (Bearer `APPROVAL_API_TOKEN`/`HANDOFF_API_TOKEN`) — nenhuma lógica de negócio nova.
+Entrypoint: `scripts/mcp_server.py` (registrar no `claude_desktop_config.json` apontando pro
+Python do venv com o extra `mcp` instalado; precisa de `DATABASE_URL` e
+`REVENUEFLOW_API_BASE_URL` configurados no ambiente). `mcp/tools.py` não depende do pacote `mcp` —
+testável na suíte padrão sem o extra instalado.
 
 ## Skills
 
@@ -462,3 +484,4 @@ Claude deve localizar e ler os documentos relacionados antes de implementar.
 - [ADR-060 — LANDING_PAGE: hosting estático GCS + Cloud CDN, sem domínio/HTTPS na V1](docs/adrs/adr-060-landing-page-gcs-cdn.md)
 - [ADR-061 — ANALYTICS: sync batch Postgres → BigQuery, domínio Revenue + Custo de IA](docs/adrs/adr-061-analytics-bigquery-revenue-cost.md)
 - [ADR-063 — ANALYTICS_360: os 4 domínios restantes do PRD-015](docs/adrs/adr-063-analytics-360-remaining-prd015-domains.md)
+- [ADR-064 — Servidor MCP pessoal: leitura + operações internas já existentes, stdio](docs/adrs/adr-064-personal-mcp-server-read-and-internal-ops.md)
