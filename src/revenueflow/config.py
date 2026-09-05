@@ -36,6 +36,8 @@ class Settings(BaseSettings):
 
     bigquery_dataset: str = "revenueflow_analytics"
 
+    lead_stale_days: int = 30
+
     handoff_api_token: str = ""
     handoff_min_confidence: float = 0.55
     handoff_high_value_threshold: Decimal = Decimal("50000")
