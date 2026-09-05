@@ -193,6 +193,11 @@ Fatias entregues, arquivadas em `.claude/sdd/archive/`:
   mesmo Bearer). `mcp/tools.py` isola a lógica de negócio do pacote `mcp` — testável sem o extra
   instalado (`httpx.MockTransport` pras tools de ação). **Sem** servidor hospedado/multi-tenant,
   sem tool de escrita nova além das rotas já existentes (ADR-064).
+- **WHATSAPP_CTA** (2026-09-05, ADR-066) — CTA de WhatsApp na landing page (ADR-060), pedido
+  explicitamente pelo usuário. Deep link `https://wa.me/<E.164>?text=...` em 3 pontos (topnav, hero,
+  rodapé) leva o visitante direto pro fluxo já em produção (`WHATSAPP_INBOUND_SLICE`) — sem
+  formulário, sem backend novo, sem analytics de clique. Número fixo no HTML, editado como copy
+  estática (mesmo fluxo de deploy do ADR-060). Zero código Python/Terraform tocado.
 - **MCP_READONLY_PUBLIC** (2026-09-05, ADR-067) — MCP público de leitura, pedido explicitamente
   pelo usuário ("online, só visualização, pra outras pessoas") — emenda o "fora de escopo" do
   ADR-064 só pra essa capacidade. Novo Cloud Run service `revenueflow-mcp-readonly` (mesma imagem
@@ -517,4 +522,5 @@ Claude deve localizar e ler os documentos relacionados antes de implementar.
 - [ADR-063 — ANALYTICS_360: os 4 domínios restantes do PRD-015](docs/adrs/adr-063-analytics-360-remaining-prd015-domains.md)
 - [ADR-064 — Servidor MCP pessoal: leitura + operações internas já existentes, stdio](docs/adrs/adr-064-personal-mcp-server-read-and-internal-ops.md)
 - [ADR-065 — Acesso de leitura ao dashboard: roles/monitoring.viewer por e-mail](docs/adrs/adr-065-dashboard-viewer-access-monitoring-viewer.md)
+- [ADR-066 — CTA de WhatsApp na landing page: deep link wa.me, sem backend novo](docs/adrs/adr-066-whatsapp-cta-landing-page.md)
 - [ADR-067 — MCP público de leitura: novo Cloud Run service, Streamable HTTP, bearer compartilhado](docs/adrs/adr-067-public-readonly-mcp-server.md)
