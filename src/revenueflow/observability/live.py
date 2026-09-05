@@ -11,6 +11,9 @@ import logging
 import time
 from collections.abc import AsyncIterator
 
+import psycopg
+
+from revenueflow.config import get_settings
 from revenueflow.repositories.db import get_pool
 
 _LOGGER = logging.getLogger(__name__)
@@ -46,9 +49,17 @@ async def _notify(*, conversation_id: str, agent: str, status: str) -> None:
 
 async def listen() -> AsyncIterator[str]:
     """Yields raw JSON payload strings as they arrive. One dedicated LISTEN
-    connection per caller — closed automatically when the generator exits
-    (client disconnect)."""
-    async with get_pool().connection() as conn:
+    connection per caller (opened directly, NOT from the shared pool) —
+    closed automatically when the generator exits (client disconnect).
+
+    A pool connection is wrong here: repositories.db.get_pool() sets
+    statement_timeout (ADR-057's turn latency budget) on every connection it
+    hands out, which cancels conn.notifies()'s indefinite wait after a few
+    seconds — confirmed by a real CI failure, not a hypothetical. A plain
+    connection with no statement_timeout, outside the pool, also keeps a
+    long-lived LISTEN from competing with the pool used for turn processing.
+    """
+    async with await psycopg.AsyncConnection.connect(get_settings().database_url) as conn:
         await conn.execute(f"LISTEN {_CHANNEL}")
         async for notify in conn.notifies():
             yield notify.payload
