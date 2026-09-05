@@ -18,6 +18,7 @@ dependencies = [
     "langgraph>=0.2.28",
     "langgraph-checkpoint-postgres>=2.0.1",
     "jinja2>=3.1",
+    "python-multipart>=0.0.9",
 ]
 
 [project.optional-dependencies]
@@ -49,11 +50,11 @@ mcp = [
     "mcp>=1.9,<2",
 ]
 # Operational portal (ADR-073): Google Sign-In verification (client-side
-# token, no client secret). jinja2 is a base dependency (see above) — unlike
-# google-auth, it's imported at module scope by portal/views.py
-# (fastapi.templating.Jinja2Templates), so gating it behind this extra would
-# make the whole package unimportable in CI's base `tests` job (installs only
-# `.[dev,llm]`, never `portal`).
+# token, no client secret). jinja2/python-multipart are base dependencies
+# (see above) — unlike google-auth, both are needed just to import
+# portal/views.py (Jinja2Templates + Form(...) routes), so gating them behind
+# this extra would make the whole package unimportable in CI's base `tests`
+# job (installs only `.[dev,llm]`, never `portal`).
 portal = [
     "google-auth>=2.34",
 ]
