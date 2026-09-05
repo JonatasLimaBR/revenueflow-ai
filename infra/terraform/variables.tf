@@ -120,3 +120,9 @@ variable "alert_no_turns_minutes" {
   description = "Minutes without an audited turn that fires the consumer-liveness alert"
   default     = 15
 }
+
+variable "landing_domain" {
+  type        = string
+  description = "Custom domain for the landing page (ADR-068); empty skips the managed cert/HTTPS proxy/redirect and leaves ADR-060's HTTP-only setup as-is"
+  default     = "mastavista.com.br"
+}
