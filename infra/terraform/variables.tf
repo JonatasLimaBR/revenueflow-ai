@@ -85,6 +85,12 @@ variable "alert_email" {
   default     = ""
 }
 
+variable "dashboard_viewer_emails" {
+  type        = list(string)
+  description = "Google account emails granted read-only access to the Cloud Monitoring dashboard (roles/monitoring.viewer only, ADR-065); empty by default, fill in when onboarding a viewer"
+  default     = []
+}
+
 variable "alert_5xx_ratio" {
   type        = number
   description = "5xx-to-total request ratio that fires the availability alert"
