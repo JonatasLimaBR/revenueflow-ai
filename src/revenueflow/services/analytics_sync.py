@@ -1,17 +1,17 @@
-"""Revenue + AI-cost analytics sync (PRD-015, ADR-005/061).
+"""Revenue/cost/customer/lead/opportunity/handoff analytics sync (PRD-015, ADR-005/061/063).
 
 ``run`` is a batch job, outside the graph and outside ``process_event``, same
 shape as ``services.opportunity.scan`` and ``services.campaign.run``: it reads
 the already-computed OLTP views (Postgres stays the source of truth for the
 business logic, ADR-004) and loads a full snapshot into BigQuery with
 ``WRITE_TRUNCATE`` — idempotent by construction, no dedup needed. A failure
-loading one table does not block the other.
+loading one table does not block the others.
 """
 
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 from uuid import uuid4
 
@@ -39,11 +39,53 @@ _COST_PER_OUTCOME_SCHEMA = [
     ("avg_latency_ms", "FLOAT64"),
 ]
 
+_CUSTOMER_360_SCHEMA = [
+    ("customer_id", "STRING"),
+    ("orders_12m", "INT64"),
+    ("revenue_12m", "FLOAT64"),
+    ("last_purchase", "TIMESTAMP"),
+    ("purchase_interval_days", "FLOAT64"),
+    ("preferred_product", "STRING"),
+    ("open_quotes", "INT64"),
+]
+
+_LEAD_FUNNEL_SCHEMA = [
+    ("lead_id", "STRING"),
+    ("status", "STRING"),
+    ("created_at", "TIMESTAMP"),
+]
+
+_OPPORTUNITY_SUMMARY_SCHEMA = [
+    ("opportunity_id", "STRING"),
+    ("customer_id", "STRING"),
+    ("opportunity_type", "STRING"),
+    ("status", "STRING"),
+    ("estimated_revenue", "FLOAT64"),
+    ("probability", "FLOAT64"),
+    ("created_at", "TIMESTAMP"),
+]
+
+_HANDOFF_RATE_SCHEMA = [
+    ("total_turns", "INT64"),
+    ("handoff_turns", "INT64"),
+]
+
+# (BigQuery table name, repositories.analytics function name, BigQuery schema). The function is
+# looked up by name on every call (``getattr(analytics_repo, fn_name)``) rather than bound once at
+# import time, so tests can monkeypatch ``analytics_repo.<fn_name>`` and have it take effect here.
+_SOURCES: list[tuple[str, str, list[tuple[str, str]]]] = [
+    ("conversation_revenue", "conversation_revenue", _CONVERSATION_REVENUE_SCHEMA),
+    ("cost_per_outcome", "cost_per_outcome", _COST_PER_OUTCOME_SCHEMA),
+    ("customer_360", "customer_360_all", _CUSTOMER_360_SCHEMA),
+    ("lead_funnel", "lead_funnel", _LEAD_FUNNEL_SCHEMA),
+    ("opportunity_summary", "opportunity_summary", _OPPORTUNITY_SUMMARY_SCHEMA),
+    ("handoff_rate", "handoff_rate", _HANDOFF_RATE_SCHEMA),
+]
+
 
 @dataclass(slots=True)
 class SyncResult:
-    conversation_rows: int = 0
-    outcome_rows: int = 0
+    rows_loaded: dict[str, int] = field(default_factory=dict)
     errors: int = 0
 
 
@@ -53,36 +95,19 @@ async def run() -> SyncResult:
     settings = get_settings()
     result = SyncResult()
     trace_id = uuid4().hex[:8]
-
-    async with read_connection() as conn:
-        conv_rows = await analytics_repo.conversation_revenue(conn)
-        outcome_rows = await analytics_repo.cost_per_outcome(conn)
-
     client = bigquery.Client()
 
-    if _load(
-        client,
-        settings.bigquery_dataset,
-        "conversation_revenue",
-        conv_rows,
-        _CONVERSATION_REVENUE_SCHEMA,
-        trace_id,
-    ):
-        result.conversation_rows = len(conv_rows)
-    else:
-        result.errors += 1
+    async with read_connection() as conn:
+        fetched = {
+            name: await getattr(analytics_repo, fn_name)(conn) for name, fn_name, _ in _SOURCES
+        }
 
-    if _load(
-        client,
-        settings.bigquery_dataset,
-        "cost_per_outcome",
-        outcome_rows,
-        _COST_PER_OUTCOME_SCHEMA,
-        trace_id,
-    ):
-        result.outcome_rows = len(outcome_rows)
-    else:
-        result.errors += 1
+    for name, _fn_name, schema in _SOURCES:
+        rows = fetched[name]
+        if _load(client, settings.bigquery_dataset, name, rows, schema, trace_id):
+            result.rows_loaded[name] = len(rows)
+        else:
+            result.errors += 1
 
     return result
 

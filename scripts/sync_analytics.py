@@ -5,10 +5,8 @@ from revenueflow.services.analytics_sync import run
 
 def main() -> int:
     result = asyncio.run(run())
-    print(
-        f"analytics sync: conversation_rows={result.conversation_rows} "
-        f"outcome_rows={result.outcome_rows} errors={result.errors}"
-    )
+    rows = " ".join(f"{name}={count}" for name, count in result.rows_loaded.items())
+    print(f"analytics sync: {rows} errors={result.errors}")
     return 0
 
 
