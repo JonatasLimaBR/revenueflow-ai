@@ -179,6 +179,13 @@ Fatias entregues, arquivadas em `.claude/sdd/archive/`:
   += 4 tabelas de fato + 3 views (`v_lead_conversion`/`v_opportunity_pipeline`/`v_opportunity_conversion`),
   mesmo dataset e IAM já escopados — nenhum recurso de IAM novo. **Sem** dashboard/Looker Studio,
   sem histórico de tendência, sem Cloud Scheduler (ADR-063).
+- **DASHBOARD_ACCESS** (2026-09-05, ADR-065) — acesso de leitura ao dashboard do Cloud Monitoring
+  (ADR-056) para outras pessoas via conta Google. Cloud Monitoring não tem IAM por dashboard
+  individual — `google_project_iam_member` com `for_each` sobre `var.dashboard_viewer_emails`
+  (`list(string)`, default `[]`) concede `roles/monitoring.viewer` de projeto (o papel de leitura
+  mais estreito disponível: dashboards/métricas/alertas, nada além disso) por e-mail. Lista vazia
+  por padrão — infraestrutura pronta, ninguém novo ganha acesso até o `tfvars` ser preenchido com
+  e-mails reais. **Sem** grupo do Workspace, sem papel mais amplo que `monitoring.viewer` (ADR-065).
 
 Deploy: o ambiente GCP está no ar (Cloud Run `revenueflow-api`, Cloud SQL, Pub/Sub, Cloud Run
 Jobs `revenueflow-api-migrate`, `revenueflow-opportunity-scan`, `revenueflow-campaign-run`,
@@ -187,8 +194,9 @@ simulado aplicados. Landing page em `http://<landing_page_ip>` (output do Terraf
 próprio ainda, ADR-060). Pendências operacionais: valores reais dos secrets do WhatsApp, registro
 do webhook no Meta, `gcloud run jobs execute revenueflow-api-migrate` para aplicar `0005`–`0014`,
 popular `consent_opt_in_at` de clientes reais antes de rodar `revenueflow-campaign-run` em
-produção, `gcloud run jobs execute revenueflow-analytics-sync` para o primeiro sync do BigQuery, e
-preencher `alert_email` no tfvars para os alertas do Cloud Monitoring notificarem.
+produção, `gcloud run jobs execute revenueflow-analytics-sync` para o primeiro sync do BigQuery,
+preencher `alert_email` no tfvars para os alertas do Cloud Monitoring notificarem, e preencher
+`dashboard_viewer_emails` no tfvars com os e-mails reais dos viewers do dashboard.
 
 O código de aplicação **existe** e não é mais scaffolding.
 
@@ -472,3 +480,4 @@ Claude deve localizar e ler os documentos relacionados antes de implementar.
 - [ADR-061 — ANALYTICS: sync batch Postgres → BigQuery, domínio Revenue + Custo de IA](docs/adrs/adr-061-analytics-bigquery-revenue-cost.md)
 - [ADR-062 — LEAD_LIFECYCLE: transições determinísticas de status + promoção lead→customer](docs/adrs/adr-062-lead-lifecycle-deterministic-transitions.md)
 - [ADR-063 — ANALYTICS_360: os 4 domínios restantes do PRD-015](docs/adrs/adr-063-analytics-360-remaining-prd015-domains.md)
+- [ADR-065 — Acesso de leitura ao dashboard: roles/monitoring.viewer por e-mail](docs/adrs/adr-065-dashboard-viewer-access-monitoring-viewer.md)

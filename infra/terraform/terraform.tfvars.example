@@ -20,3 +20,7 @@ tracer_sink   = "otel"
 # Optional: set to enable the budget alert.
 # billing_account   = "XXXXXX-XXXXXX-XXXXXX"
 # budget_amount_usd = 200
+
+# Read-only Cloud Monitoring dashboard access for teammates (ADR-065). Empty =
+# no one but the project's existing IAM members can see the dashboard.
+# dashboard_viewer_emails = ["teammate1@example.com", "teammate2@example.com"]
