@@ -5,10 +5,12 @@ _TF = Path(__file__).resolve().parents[2] / "infra" / "terraform"
 
 _LOG_METRICS = {
     "revenueflow_turn_cost_usd",
+    "revenueflow_turn_cost_usd_total",
     "revenueflow_turn_latency_ms",
     "revenueflow_turns",
     "revenueflow_handoffs",
     "revenueflow_tool_failures",
+    "revenueflow_tool_failures_total",
 }
 
 
@@ -19,6 +21,23 @@ def test_monitoring_tf_declares_all_log_metrics() -> None:
     assert body.count('resource "google_monitoring_alert_policy"') == 5
     assert 'resource "google_monitoring_dashboard" "revenueflow_ops"' in body
     assert "condition_absent" in body
+
+
+def test_sum_alerts_use_scalar_metrics_not_distributions() -> None:
+    # ADR-071: ALIGN_SUM on a DISTRIBUTION-typed log metric doesn't reduce to
+    # a scalar in Cloud Monitoring's API — the tool_failures/ai_cost_per_hour
+    # alerts must filter on the plain-numeric "_total" sibling metrics, not
+    # the histogram ones the dashboard uses.
+    body = (_TF / "monitoring.tf").read_text()
+    tool_failures_block = body.split(
+        'resource "google_monitoring_alert_policy" "tool_failures"', 1
+    )[1].split("\nresource ", 1)[0]
+    assert "revenueflow_tool_failures_total" in tool_failures_block
+
+    cost_block = body.split('resource "google_monitoring_alert_policy" "ai_cost_per_hour"', 1)[
+        1
+    ].split("\nresource ", 1)[0]
+    assert "revenueflow_turn_cost_usd_total" in cost_block
 
 
 def test_alert_email_variable_has_a_default() -> None:

@@ -32,6 +32,28 @@ resource "google_logging_metric" "turn_cost_usd" {
   depends_on = [google_project_service.this]
 }
 
+# Plain-numeric sibling of turn_cost_usd, for the ai_cost_per_hour alert only
+# (found live in production, ADR-071): Cloud Monitoring's ALIGN_SUM does not
+# reduce a DISTRIBUTION metric to a scalar (only percentile aligners do,
+# which would change the alert from "total $/hour" to "one turn's
+# percentile") — a second, non-distribution metric is the correct fix, not a
+# different aligner on the histogram metric the dashboard already depends on.
+resource "google_logging_metric" "turn_cost_usd_total" {
+  name        = "revenueflow_turn_cost_usd_total"
+  description = "Per-turn AI cost in USD, plain numeric for ALIGN_SUM alerting (audit.turn)"
+  filter      = local.turn_filter
+
+  metric_descriptor {
+    metric_kind = "DELTA"
+    value_type  = "DOUBLE"
+    unit        = "1"
+  }
+
+  value_extractor = "EXTRACT(jsonPayload.cost_usd)"
+
+  depends_on = [google_project_service.this]
+}
+
 resource "google_logging_metric" "turn_latency_ms" {
   name        = "revenueflow_turn_latency_ms"
   description = "Per-turn latency in ms (audit.turn)"
@@ -112,6 +134,23 @@ resource "google_logging_metric" "tool_failures" {
       offset             = 0
     }
   }
+
+  depends_on = [google_project_service.this]
+}
+
+# Plain-numeric sibling of tool_failures, same reason as turn_cost_usd_total
+# above (ADR-071) — the tool_failures alert needs ALIGN_SUM to work.
+resource "google_logging_metric" "tool_failures_total" {
+  name        = "revenueflow_tool_failures_total"
+  description = "Unhandled tool exceptions per turn, plain numeric for ALIGN_SUM alerting (audit.turn)"
+  filter      = local.turn_filter
+
+  metric_descriptor {
+    metric_kind = "DELTA"
+    value_type  = "INT64"
+  }
+
+  value_extractor = "EXTRACT(jsonPayload.tool_failures)"
 
   depends_on = [google_project_service.this]
 }
@@ -225,7 +264,7 @@ resource "google_monitoring_alert_policy" "tool_failures" {
     display_name = "tool exceptions over ${var.alert_tool_failures_per_hour} / hour"
 
     condition_threshold {
-      filter = "metric.type=\"logging.googleapis.com/user/revenueflow_tool_failures\" AND resource.type=\"cloud_run_revision\""
+      filter = "metric.type=\"logging.googleapis.com/user/revenueflow_tool_failures_total\" AND resource.type=\"cloud_run_revision\""
 
       comparison      = "COMPARISON_GT"
       threshold_value = var.alert_tool_failures_per_hour
@@ -245,7 +284,9 @@ resource "google_monitoring_alert_policy" "tool_failures" {
     mime_type = "text/markdown"
   }
 
-  depends_on = [google_project_service.this]
+  # Explicit — the filter above references the metric by name (a string),
+  # not by resource attribute, so Terraform has no implicit dependency edge.
+  depends_on = [google_project_service.this, google_logging_metric.tool_failures_total]
 }
 
 resource "google_monitoring_alert_policy" "ai_cost_per_hour" {
@@ -256,7 +297,7 @@ resource "google_monitoring_alert_policy" "ai_cost_per_hour" {
     display_name = "AI cost over $${var.alert_ai_cost_per_hour_usd} / hour"
 
     condition_threshold {
-      filter = "metric.type=\"logging.googleapis.com/user/revenueflow_turn_cost_usd\" AND resource.type=\"cloud_run_revision\""
+      filter = "metric.type=\"logging.googleapis.com/user/revenueflow_turn_cost_usd_total\" AND resource.type=\"cloud_run_revision\""
 
       comparison      = "COMPARISON_GT"
       threshold_value = var.alert_ai_cost_per_hour_usd
@@ -276,7 +317,8 @@ resource "google_monitoring_alert_policy" "ai_cost_per_hour" {
     mime_type = "text/markdown"
   }
 
-  depends_on = [google_project_service.this]
+  # Explicit — same reason as tool_failures above.
+  depends_on = [google_project_service.this, google_logging_metric.turn_cost_usd_total]
 }
 
 resource "google_monitoring_alert_policy" "no_turns" {
