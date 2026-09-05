@@ -23,6 +23,39 @@ _CONV_ROW = {
 
 _OUTCOME_ROW = {"outcome": "replied", "turns": 5, "cost_usd": 2.0, "avg_latency_ms": 300.0}
 
+_CUSTOMER_360_ROW = {
+    "customer_id": "cust1",
+    "orders_12m": 3,
+    "revenue_12m": 300.0,
+    "last_purchase": "2026-09-01T00:00:00",
+    "purchase_interval_days": 10.0,
+    "preferred_product": "p1",
+    "open_quotes": 1,
+}
+
+_LEAD_FUNNEL_ROW = {"lead_id": "lead1", "status": "QUALIFIED", "created_at": "2026-08-01T00:00:00"}
+
+_OPPORTUNITY_SUMMARY_ROW = {
+    "opportunity_id": "opp1",
+    "customer_id": "cust1",
+    "opportunity_type": "REPLENISHMENT",
+    "status": "OPEN",
+    "estimated_revenue": 50.0,
+    "probability": 0.4,
+    "created_at": "2026-08-15T00:00:00",
+}
+
+_HANDOFF_RATE_ROW = {"total_turns": 10, "handoff_turns": 2}
+
+_ALL_TABLES = {
+    "conversation_revenue",
+    "cost_per_outcome",
+    "customer_360",
+    "lead_funnel",
+    "opportunity_summary",
+    "handoff_rate",
+}
+
 
 @asynccontextmanager
 async def _fake_read_connection() -> AsyncIterator[None]:
@@ -96,25 +129,41 @@ def _no_real_db(monkeypatch: pytest.MonkeyPatch) -> None:
     async def _outcome(conn: object) -> list[dict[str, Any]]:
         return [dict(_OUTCOME_ROW)]
 
+    async def _customer_360(conn: object) -> list[dict[str, Any]]:
+        return [dict(_CUSTOMER_360_ROW)]
+
+    async def _lead_funnel(conn: object) -> list[dict[str, Any]]:
+        return [dict(_LEAD_FUNNEL_ROW)]
+
+    async def _opportunity_summary(conn: object) -> list[dict[str, Any]]:
+        return [dict(_OPPORTUNITY_SUMMARY_ROW)]
+
+    async def _handoff_rate(conn: object) -> list[dict[str, Any]]:
+        return [dict(_HANDOFF_RATE_ROW)]
+
     monkeypatch.setattr(analytics_repo, "conversation_revenue", _conv)
     monkeypatch.setattr(analytics_repo, "cost_per_outcome", _outcome)
+    monkeypatch.setattr(analytics_repo, "customer_360_all", _customer_360)
+    monkeypatch.setattr(analytics_repo, "lead_funnel", _lead_funnel)
+    monkeypatch.setattr(analytics_repo, "opportunity_summary", _opportunity_summary)
+    monkeypatch.setattr(analytics_repo, "handoff_rate", _handoff_rate)
 
 
-async def test_run_loads_both_tables(bq: dict[str, Any]) -> None:
+async def test_run_loads_all_six_tables(bq: dict[str, Any]) -> None:
     result = await analytics_sync.run()
 
-    assert result.conversation_rows == 1
-    assert result.outcome_rows == 1
     assert result.errors == 0
-    assert len(bq["calls"]) == 2
+    assert set(result.rows_loaded) == _ALL_TABLES
+    assert all(count == 1 for count in result.rows_loaded.values())
+    assert len(bq["calls"]) == 6
     tables = {call[1].rsplit(".", 1)[-1] for call in bq["calls"]}
-    assert tables == {"conversation_revenue", "cost_per_outcome"}
+    assert tables == _ALL_TABLES
 
 
-async def test_run_uses_write_truncate_for_both_loads(bq: dict[str, Any]) -> None:
+async def test_run_uses_write_truncate_for_all_loads(bq: dict[str, Any]) -> None:
     await analytics_sync.run()
 
-    assert len(bq["calls"]) == 2
+    assert len(bq["calls"]) == 6
     for _, _, job_config in bq["calls"]:
         assert job_config.write_disposition == "WRITE_TRUNCATE"
 
@@ -124,14 +173,14 @@ async def test_run_survives_one_table_failing(bq: dict[str, Any]) -> None:
 
     result = await analytics_sync.run()
 
-    assert result.conversation_rows == 1
-    assert result.outcome_rows == 0
     assert result.errors == 1
+    assert "cost_per_outcome" not in result.rows_loaded
+    assert set(result.rows_loaded) == _ALL_TABLES - {"cost_per_outcome"}
 
 
 def test_analytics_tf_tables_have_no_pii_columns() -> None:
     tf = Path("infra/terraform/analytics.tf").read_text(encoding="utf-8")
-    for field in ("phone", "name", "email", "cpf"):
+    for field in ("phone", "name", "email", "cpf", "reason", "evidence"):
         assert f'"{field}"' not in tf
 
 
