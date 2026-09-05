@@ -11,9 +11,11 @@ COPY src ./src
 # [events] pulls google-cloud-pubsub for the in-process pull consumer
 # (RUN_CONSUMER=1, ADR-047); [llm] pulls google-genai for the real Vertex path
 # (LLM_STUB=0, ADR-049); [observability] pulls the OTel Cloud Trace exporter
-# (TRACER_SINK=otel, ADR-056). Without them run_subscriber() / model calls /
-# span export die.
-RUN pip install --upgrade pip && pip install -e ".[events,llm,observability]"
+# (TRACER_SINK=otel, ADR-056); [analytics] pulls google-cloud-bigquery for the
+# revenue/cost sync batch job (revenueflow-analytics-sync, ADR-061). Without
+# them run_subscriber() / model calls / span export / scripts/sync_analytics.py
+# die.
+RUN pip install --upgrade pip && pip install -e ".[events,llm,observability,analytics]"
 
 COPY migrations ./migrations
 COPY seeds ./seeds

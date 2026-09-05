@@ -36,6 +36,9 @@ observability = [
     "opentelemetry-sdk>=1.27",
     "opentelemetry-exporter-gcp-trace>=1.7",
 ]
+analytics = [
+    "google-cloud-bigquery>=3.25",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -66,6 +69,10 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = ["langgraph", "langgraph.*", "langchain_core", "langchain_core.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["google.cloud.bigquery", "google.cloud.bigquery.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
