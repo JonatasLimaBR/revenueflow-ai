@@ -228,9 +228,11 @@ valores reais dos secrets do WhatsApp, registro do webhook no Meta,
 `gcloud run jobs execute revenueflow-api-migrate` para aplicar `0005`–`0014`, popular
 `consent_opt_in_at` de clientes reais antes de rodar `revenueflow-campaign-run` em produção,
 `gcloud run jobs execute revenueflow-analytics-sync` para o primeiro sync do BigQuery, preencher
-`alert_email` no tfvars para os alertas do Cloud Monitoring notificarem, preencher
-`dashboard_viewer_emails` no tfvars com os e-mails reais dos viewers do dashboard, e distribuir o
-valor de `gcloud secrets versions access latest --secret=revenueflow-mcp-api-token` +
+as GitHub Actions repo variables `ALERT_EMAIL`/`DASHBOARD_VIEWER_EMAILS` (`gh variable set` —
+`terraform.yml` já as encaminha pro `plan`/`apply`, `[]` se ausente; antes dessa correção elas
+nunca chegavam ao Terraform, por isso o dashboard ficava sem viewer nenhum apesar do ADR-065
+existir) — sem isso os alertas do Cloud Monitoring não notificam e o dashboard fica sem viewer, e
+distribuir o valor de `gcloud secrets versions access latest --secret=revenueflow-mcp-api-token` +
 `mcp_readonly_url` (output do Terraform) pra quem for usar o MCP público de leitura.
 
 O código de aplicação **existe** e não é mais scaffolding.
