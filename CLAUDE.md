@@ -197,6 +197,16 @@ Fatias entregues, arquivadas em `.claude/sdd/archive/`:
   rodapé) leva o visitante direto pro fluxo já em produção (`WHATSAPP_INBOUND_SLICE`) — sem
   formulário, sem backend novo, sem analytics de clique. Número fixo no HTML, editado como copy
   estática (mesmo fluxo de deploy do ADR-060). Zero código Python/Terraform tocado.
+- **MCP_READONLY_PUBLIC** (2026-09-05, ADR-067) — MCP público de leitura, pedido explicitamente
+  pelo usuário ("online, só visualização, pra outras pessoas") — emenda o "fora de escopo" do
+  ADR-064 só pra essa capacidade. Novo Cloud Run service `revenueflow-mcp-readonly` (mesma imagem
+  da API, `command` diferente, mesmo padrão dos Jobs batch), Streamable HTTP em vez de stdio,
+  escala a zero. `mcp/server.py` dividido em `register_read_tools`/`register_action_tools` —
+  `http_server.py` só registra as 6 tools de leitura, nunca as 5 de ação. Mesmo modelo de confiança
+  das rotas `/internal/*`: `allUsers` invoker + bearer compartilhado (`MCP_API_TOKEN`,
+  Terraform-generated). `mcp/auth.py` (o `bearer_gate` ASGI) não depende do pacote `mcp` — testável
+  sem o extra instalado. `Dockerfile` ganha o extra `mcp` (deixa de ser só do ambiente pessoal).
+  **Sem** identidade por pessoa (OAuth/IAM), sem tool de ação no servidor público (ADR-067).
 - **LANDING_PAGE_DOMAIN** (2026-09-05, ADR-068) — domínio próprio `mastavista.com.br` pra landing
   page, fornecido e pedido explicitamente pelo usuário — extensão aditiva do ADR-060 (nenhum
   recurso recriado). `google_compute_managed_ssl_certificate` escopado só ao domínio (sem `www`);
@@ -207,18 +217,21 @@ Fatias entregues, arquivadas em `.claude/sdd/archive/`:
   DNS fica fora do Terraform — apontar o registro A pro `landing_page_ip` é passo manual do
   usuário no provedor de DNS; o cert fica `PROVISIONING` até isso resolver.
 
-Deploy: o ambiente GCP está no ar (Cloud Run `revenueflow-api`, Cloud SQL, Pub/Sub, Cloud Run
-Jobs `revenueflow-api-migrate`, `revenueflow-opportunity-scan`, `revenueflow-campaign-run`,
-`revenueflow-analytics-sync` e `revenueflow-lead-sweep`) via `.github/workflows/terraform.yml` (ADR-048); schema + catálogo
-simulado aplicados. Landing page em `https://mastavista.com.br` uma vez que o DNS resolver (antes
-disso, `http://<landing_page_ip>`, output do Terraform, ADR-060/068). Pendências operacionais:
-apontar o registro A de `mastavista.com.br` pro `landing_page_ip` e conferir `landing_page_cert_check`
-até `ACTIVE`, valores reais dos secrets do WhatsApp, registro
-do webhook no Meta, `gcloud run jobs execute revenueflow-api-migrate` para aplicar `0005`–`0014`,
-popular `consent_opt_in_at` de clientes reais antes de rodar `revenueflow-campaign-run` em
-produção, `gcloud run jobs execute revenueflow-analytics-sync` para o primeiro sync do BigQuery,
-preencher `alert_email` no tfvars para os alertas do Cloud Monitoring notificarem, e preencher
-`dashboard_viewer_emails` no tfvars com os e-mails reais dos viewers do dashboard.
+Deploy: o ambiente GCP está no ar (Cloud Run `revenueflow-api` + `revenueflow-mcp-readonly`, Cloud
+SQL, Pub/Sub, Cloud Run Jobs `revenueflow-api-migrate`, `revenueflow-opportunity-scan`,
+`revenueflow-campaign-run`, `revenueflow-analytics-sync` e `revenueflow-lead-sweep`) via
+`.github/workflows/terraform.yml` (ADR-048); schema + catálogo simulado aplicados. Landing page em
+`https://mastavista.com.br` uma vez que o DNS resolver (antes disso, `http://<landing_page_ip>`,
+output do Terraform, ADR-060/068). Pendências operacionais: apontar o registro A de
+`mastavista.com.br` pro `landing_page_ip` e conferir `landing_page_cert_check` até `ACTIVE`,
+valores reais dos secrets do WhatsApp, registro do webhook no Meta,
+`gcloud run jobs execute revenueflow-api-migrate` para aplicar `0005`–`0014`, popular
+`consent_opt_in_at` de clientes reais antes de rodar `revenueflow-campaign-run` em produção,
+`gcloud run jobs execute revenueflow-analytics-sync` para o primeiro sync do BigQuery, preencher
+`alert_email` no tfvars para os alertas do Cloud Monitoring notificarem, preencher
+`dashboard_viewer_emails` no tfvars com os e-mails reais dos viewers do dashboard, e distribuir o
+valor de `gcloud secrets versions access latest --secret=revenueflow-mcp-api-token` +
+`mcp_readonly_url` (output do Terraform) pra quem for usar o MCP público de leitura.
 
 O código de aplicação **existe** e não é mais scaffolding.
 
@@ -238,7 +251,7 @@ Mapa de `src/revenueflow/`:
 
 | Pacote | Papel |
 |---|---|
-| `config` | `Settings` tipado (pydantic-settings) + flags `CHANNEL_OUTBOUND`/`TRACER_SINK`/`LLM_STUB`; `google_cloud_project`/`vertex_location`/`llm_max_retries`; `log_level`/`otel_service_name`; `llm_call_timeout_s`/`db_statement_timeout_ms`/`turn_budget_s`; `bigquery_dataset`; `lead_stale_days`; `revenueflow_api_base_url` |
+| `config` | `Settings` tipado (pydantic-settings) + flags `CHANNEL_OUTBOUND`/`TRACER_SINK`/`LLM_STUB`; `google_cloud_project`/`vertex_location`/`llm_max_retries`; `log_level`/`otel_service_name`; `llm_call_timeout_s`/`db_statement_timeout_ms`/`turn_budget_s`; `bigquery_dataset`; `lead_stale_days`; `revenueflow_api_base_url`; `mcp_api_token` |
 | `domain` | erros tipados; enums `SessionStatus` (+`HUMAN_HANDOFF`)/`LeadStatus`/`Intent`/`ApprovalStatus`/`QuoteStatus`/`OrderStatus`/`PaymentStatus`/`OpportunityType`/`OpportunityStatus`/`HandoffReason`/`HandoffStatus`; dataclasses de entidade (`Quote`/`Order`/`Payment`/`Customer`/`Opportunity`/`Handoff` incl.) |
 | `observability` | `mask()` de PII (email/CPF/phone + `extra_terms`, ADR-058); porta `Tracer` (`noop`/`langfuse`/`otel` + `AuditTracer` que envolve o sink, grava `audit_event` e emite a linha `audit.turn` por turno via `flush()`); `cost_usd()` (`MODEL_PRICES` do Vertex); `logging_setup` (`JsonFormatter` stdlib + `configure_logging`); `otel_setup` (`configure_otel` — `TracerProvider` + Cloud Trace exporter, ADR-056) |
 | `events` | `EventEnvelope`; porta `EventPublisher` (`in_memory`/`pubsub`) |
@@ -248,7 +261,7 @@ Mapa de `src/revenueflow/`:
 | `services` | `ingest`, `session` (+`phone_for`), `identity` (`customer` antes do `lead`), `prompts` (v2), `llm` (stub + Vertex real), `intent`, `respond`, `pricing`, `negotiation`, `approval`, `checkout` (`is_explicit_confirmation` + `quote_from_state` + `confirm`), `opportunity` (`scan()` — batch, fora do grafo), `handoff` (`build_context` SPEC-027 + `create`/`list_pending`/`resolve`), `audit` (`persist` falha-isolada + `reconstruct`), `campaign` (`run()` — batch, Policy Gate + envio, fora do grafo), `analytics_sync` (`run()` — batch, 6 cargas via `_SOURCES`, sync BigQuery `WRITE_TRUNCATE`, fora do grafo), `lead_lifecycle` (`advance_from_turn` — síncrono, promove a Customer em `WON`; `sweep_stale()` — batch, `LOST`) |
 | `tools` | `RECOMMENDATION_TOOLS` (5 read-only, incl. `get_customer_360`) + `NEGOTIATION_TOOLS` (3 de pricing) + `CHECKOUT_TOOLS` (`create_quote`/`create_order`/`create_payment_sandbox`, determinísticas, registry isolado) + `registry` (fronteira — nenhum `set_discount`) |
 | `agents` | `TurnState`; `recommendation_node` (anexa `get_customer_360` p/ cliente conhecido); `negotiation_node` (+check `high_value_order`) + `await_approval_node` + `apply_decision_node` (ADR-050); `checkout_node` (quote/confirmação/order/payment, ADR-051); `handoff.py` (`to_handoff` + `handoff_node` que persiste + marca `HUMAN_HANDOFF`, ADR-054); `build_graph` |
-| `mcp` | Servidor MCP pessoal (ADR-064, extra opcional `mcp`, stdio): `tools.py` (leitura via `repositories.analytics` + ação via `httpx` nas rotas `/internal/*`, sem depender do pacote `mcp`) + `server.py` (encaixe fino `@mcp.tool()`) |
+| `mcp` | `tools.py` (leitura via `repositories.analytics` + ação via `httpx` nas rotas `/internal/*`, sem depender do pacote `mcp`) + `auth.py` (`bearer_gate` ASGI, também sem depender do pacote `mcp`) + `server.py` (`register_read_tools`/`register_action_tools`; servidor pessoal stdio, ADR-064, os dois) + `http_server.py` (servidor público Streamable HTTP, ADR-067, só `register_read_tools`) |
 | `api` | `webhook` (GET verify + POST 202), `health` (`/healthz`), `approvals` (`/internal/approvals`, Bearer), `handoffs` (`/internal/handoffs`, Bearer), `audit` (`/internal/audit/{conversation_id}`, Bearer). `main.py` tem um `@app.middleware("http")` de headers de segurança (ADR-058) |
 | `worker` | `process_event` (+ guard de opt-out inbound antes do grafo; + `lead_lifecycle.advance_from_turn` depois do `ainvoke`) + `process_approval_decided` (consumidores idempotentes), `subscriber` (loop Pub/Sub, roteia por `event_type`) |
 
@@ -520,4 +533,5 @@ Claude deve localizar e ler os documentos relacionados antes de implementar.
 - [ADR-064 — Servidor MCP pessoal: leitura + operações internas já existentes, stdio](docs/adrs/adr-064-personal-mcp-server-read-and-internal-ops.md)
 - [ADR-065 — Acesso de leitura ao dashboard: roles/monitoring.viewer por e-mail](docs/adrs/adr-065-dashboard-viewer-access-monitoring-viewer.md)
 - [ADR-066 — CTA de WhatsApp na landing page: deep link wa.me, sem backend novo](docs/adrs/adr-066-whatsapp-cta-landing-page.md)
+- [ADR-067 — MCP público de leitura: novo Cloud Run service, Streamable HTTP, bearer compartilhado](docs/adrs/adr-067-public-readonly-mcp-server.md)
 - [ADR-068 — Domínio próprio da landing page: mastavista.com.br, cert gerenciado, redirect HTTP→HTTPS](docs/adrs/adr-068-custom-domain-landing-page.md)

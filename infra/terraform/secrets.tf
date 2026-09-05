@@ -11,6 +11,7 @@ locals {
     LANGFUSE_SECRET_KEY      = "revenueflow-langfuse-secret-key"
     APPROVAL_API_TOKEN       = "revenueflow-approval-api-token"
     HANDOFF_API_TOKEN        = "revenueflow-handoff-api-token"
+    MCP_API_TOKEN            = "revenueflow-mcp-api-token"
   }
 }
 
@@ -83,6 +84,20 @@ resource "random_password" "handoff_token" {
 resource "google_secret_manager_secret_version" "handoff_api_token" {
   secret      = google_secret_manager_secret.manual["HANDOFF_API_TOKEN"].id
   secret_data = random_password.handoff_token.result
+}
+
+# The public read-only MCP server's bearer token (ADR-067) — same
+# Terraform-generated pattern as the approval/handoff tokens, same isolated-scope
+# rationale (a separate secret per route family). Read the current one with:
+#   gcloud secrets versions access latest --secret=revenueflow-mcp-api-token
+resource "random_password" "mcp_token" {
+  length  = 48
+  special = false
+}
+
+resource "google_secret_manager_secret_version" "mcp_api_token" {
+  secret      = google_secret_manager_secret.manual["MCP_API_TOKEN"].id
+  secret_data = random_password.mcp_token.result
 }
 
 resource "google_secret_manager_secret_iam_member" "api_manual" {

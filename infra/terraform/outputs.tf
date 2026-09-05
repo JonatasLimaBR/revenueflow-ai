@@ -56,3 +56,8 @@ output "landing_page_url_map" {
   description = "URL map name for `gcloud compute url-maps invalidate-cdn-cache` in CD"
   value       = google_compute_url_map.landing.name
 }
+
+output "mcp_readonly_url" {
+  description = "Public read-only MCP server URL (ADR-067) — add /mcp and the Authorization: Bearer <MCP_API_TOKEN> header in the client config"
+  value       = google_cloud_run_v2_service.mcp_readonly.uri
+}

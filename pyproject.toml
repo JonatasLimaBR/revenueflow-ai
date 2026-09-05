@@ -39,8 +39,10 @@ observability = [
 analytics = [
     "google-cloud-bigquery>=3.25",
 ]
+# >=1.9 for FastMCP.streamable_http_app() (ADR-067, the public read-only HTTP
+# server); the personal stdio server (ADR-064) only needed the base package.
 mcp = [
-    "mcp>=1.2",
+    "mcp>=1.9",
 ]
 
 [tool.setuptools.packages.find]
