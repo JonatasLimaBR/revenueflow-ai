@@ -66,7 +66,85 @@ completa](#documentação-completa).
 
 ## Arquitetura
 
-### Fluxo de uma mensagem
+### Diagrama de arquitetura completo
+
+```mermaid
+flowchart TB
+    WA(["Cliente<br/>WhatsApp Business"])
+
+    subgraph API["Cloud Run · revenueflow-api"]
+        direction TB
+        WEBHOOK["POST /webhook/whatsapp<br/>HMAC verificado"]
+        INTERNAL["/internal/approvals<br/>/internal/handoffs<br/>/internal/audit<br/>(Bearer)"]
+        WORKER["Worker<br/>process_event / process_approval_decided<br/>(idempotente)"]
+        GRAPH["Grafo LangGraph<br/>classify_intent → supervisor →<br/>handoff / recommendation → respond<br/>/ negotiation → await_approval → apply_decision<br/>/ checkout"]
+        WORKER --> GRAPH
+    end
+
+    subgraph JOBS["Cloud Run Jobs · batch"]
+        direction TB
+        OPP["opportunity-scan"]
+        CAMP["campaign-run"]
+        SWEEP["lead-sweep"]
+        SYNC["analytics-sync"]
+        MIGRATE["api-migrate"]
+    end
+
+    subgraph DATA["Dados"]
+        direction TB
+        PS[("Pub/Sub<br/>message_received<br/>approval_decided")]
+        SQL[("Cloud SQL · PostgreSQL<br/>sessão · pedido · aprovação<br/>auditoria · checkpoint do grafo")]
+        BQ[("BigQuery<br/>revenue · customer 360<br/>lead funnel · opportunity")]
+    end
+
+    VERTEX["Vertex AI / Gemini<br/>gemini-2.5-flash · keyless via ADC"]
+
+    subgraph OBS["Observabilidade"]
+        direction TB
+        LOGS["Cloud Logging<br/>linha audit.turn"]
+        METRICS["Log-based metrics +<br/>dashboard Cloud Monitoring"]
+        ALERTS["5 alert policies<br/>5xx · p95 · tool fail · custo/h · silêncio"]
+        TRACE["Cloud Trace (OTel)"]
+        LOGS --> METRICS --> ALERTS
+    end
+
+    CDN["Cloud Storage + Cloud CDN<br/>landing page estática"]
+    MCP["Servidor MCP · stdio<br/>Claude Desktop / Claude Code"]
+    TF["Terraform<br/>plan no PR · apply em main<br/>GitHub Actions + WIF (sem chave)"]
+
+    WA -->|"HMAC"| WEBHOOK --> PS --> WORKER
+    GRAPH <-->|"checkpoint + estado"| SQL
+    GRAPH -->|"intent + resposta ancorada"| VERTEX
+    GRAPH -->|"resposta / proposta / handoff"| WA
+    INTERNAL <--> SQL
+    INTERNAL -->|"approval_decided"| PS
+
+    OPP --> SQL
+    CAMP --> SQL
+    CAMP -->|"template WhatsApp"| WA
+    SWEEP --> SQL
+    SYNC --> SQL
+    SYNC --> BQ
+    MIGRATE --> SQL
+
+    WORKER -.-> LOGS
+    GRAPH -.-> LOGS
+    WORKER -.->|"TRACER_SINK=otel"| TRACE
+
+    MCP -->|"leitura direta"| SQL
+    MCP -->|"tools de ação"| INTERNAL
+
+    TF -.->|"provisiona"| API
+    TF -.->|"provisiona"| JOBS
+    TF -.->|"provisiona"| DATA
+    TF -.->|"provisiona"| OBS
+    TF -.->|"provisiona"| CDN
+```
+
+*(Diagrama versionado como código — [`README.md`](README.md) é a fonte, sem imagem estática pra
+ficar desatualizada. Renderiza nativamente no GitHub.)*
+
+### Fluxo de uma mensagem (zoom-in)
 
 ```mermaid
 flowchart LR
