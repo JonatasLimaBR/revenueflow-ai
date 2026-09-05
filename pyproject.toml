@@ -47,6 +47,13 @@ analytics = [
 mcp = [
     "mcp>=1.9,<2",
 ]
+# Operational portal (ADR-073): Google Sign-In verification (client-side
+# token, no client secret) + server-rendered templates. jinja2 backs
+# fastapi.templating.Jinja2Templates.
+portal = [
+    "google-auth>=2.34",
+    "jinja2>=3.1",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -85,6 +92,10 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = ["mcp", "mcp.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["google.auth", "google.auth.*", "google.oauth2", "google.oauth2.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

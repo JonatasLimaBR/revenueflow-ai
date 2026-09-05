@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %} — Clientes{% endblock %}
+{% block content %}
+<h1 style="font-size:1.3rem;">Clientes (360°)</h1>
+<div class="card">
+{% if customers %}
+<table>
+  <tr><th>Cliente</th><th>Pedidos (12m)</th><th>Receita (12m)</th><th>Última compra</th><th>Produto preferido</th><th>Quotes abertas</th></tr>
+  {% for c in customers %}
+  <tr>
+    <td>{{ c.customer_id }}</td>
+    <td>{{ c.orders_12m }}</td>
+    <td>${{ "%.2f"|format(c.revenue_12m|float) }}</td>
+    <td>{{ c.last_purchase or "—" }}</td>
+    <td>{{ c.preferred_product or "—" }}</td>
+    <td>{{ c.open_quotes }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<p class="empty">Nenhum cliente ainda.</p>
+{% endif %}
+</div>
+{% endblock %}

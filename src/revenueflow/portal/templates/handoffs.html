@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %} — Handoffs{% endblock %}
+{% block content %}
+<h1 style="font-size:1.3rem;">Handoffs pendentes</h1>
+{% if handoffs %}
+{% for h in handoffs %}
+<div class="card" style="margin-bottom:1rem;">
+  <p><strong>{{ h.handoff_id }}</strong> · conversa {{ h.conversation_id }} · motivo <span class="pill">{{ h.reason }}</span></p>
+  <p style="color:var(--muted); font-size:0.85rem;">criado em {{ h.created_at or "—" }}</p>
+  <details><summary>contexto</summary><pre style="white-space:pre-wrap; font-size:0.8rem;">{{ h.context | tojson(indent=2) }}</pre></details>
+  <form method="post" action="/portal/handoffs/{{ h.handoff_id }}">
+    <button type="submit">Marcar como resolvido</button>
+  </form>
+</div>
+{% endfor %}
+{% else %}
+<div class="card"><p class="empty">Nenhum handoff pendente.</p></div>
+{% endif %}
+{% endblock %}
+{% block autorefresh %}<script>setInterval(() => location.reload(), 30000);</script>{% endblock %}

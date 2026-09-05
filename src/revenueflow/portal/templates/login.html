@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %} — Login{% endblock %}
+{% block head %}
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+{% endblock %}
+{% block content %}
+<div style="display:flex; align-items:center; justify-content:center; min-height:70vh;">
+  <div class="card" style="text-align:center; max-width:360px;">
+    <h1 style="font-size:1.2rem;">RevenueFlow Portal</h1>
+    <p style="color:var(--muted); font-size:0.9rem;">Acesso restrito à equipe.</p>
+    {% if google_client_id %}
+    <div id="g_id_onload"
+         data-client_id="{{ google_client_id }}"
+         data-callback="onSignIn">
+    </div>
+    <div class="g_id_signin" data-type="standard"></div>
+    <form id="loginForm" method="post" action="/portal/login" style="display:none;">
+      <input type="hidden" name="id_token" id="id_token">
+    </form>
+    <script>
+      function onSignIn(response) {
+        document.getElementById("id_token").value = response.credential;
+        document.getElementById("loginForm").submit();
+      }
+    </script>
+    {% else %}
+    <p class="empty">Login do Google não configurado (PORTAL_GOOGLE_CLIENT_ID ausente).</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
