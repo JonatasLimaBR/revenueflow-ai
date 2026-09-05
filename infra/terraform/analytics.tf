@@ -41,6 +41,115 @@ resource "google_bigquery_table" "cost_per_outcome" {
   ])
 }
 
+resource "google_bigquery_table" "customer_360" {
+  dataset_id          = google_bigquery_dataset.analytics.dataset_id
+  table_id            = "customer_360"
+  deletion_protection = false
+
+  schema = jsonencode([
+    { name = "customer_id", type = "STRING", mode = "REQUIRED" },
+    { name = "orders_12m", type = "INT64", mode = "NULLABLE" },
+    { name = "revenue_12m", type = "FLOAT64", mode = "NULLABLE" },
+    { name = "last_purchase", type = "TIMESTAMP", mode = "NULLABLE" },
+    { name = "purchase_interval_days", type = "FLOAT64", mode = "NULLABLE" },
+    { name = "preferred_product", type = "STRING", mode = "NULLABLE" },
+    { name = "open_quotes", type = "INT64", mode = "NULLABLE" },
+  ])
+}
+
+resource "google_bigquery_table" "lead_funnel" {
+  dataset_id          = google_bigquery_dataset.analytics.dataset_id
+  table_id            = "lead_funnel"
+  deletion_protection = false
+
+  schema = jsonencode([
+    { name = "lead_id", type = "STRING", mode = "REQUIRED" },
+    { name = "status", type = "STRING", mode = "NULLABLE" },
+    { name = "created_at", type = "TIMESTAMP", mode = "NULLABLE" },
+  ])
+}
+
+resource "google_bigquery_table" "opportunity_summary" {
+  dataset_id          = google_bigquery_dataset.analytics.dataset_id
+  table_id            = "opportunity_summary"
+  deletion_protection = false
+
+  schema = jsonencode([
+    { name = "opportunity_id", type = "STRING", mode = "REQUIRED" },
+    { name = "customer_id", type = "STRING", mode = "NULLABLE" },
+    { name = "opportunity_type", type = "STRING", mode = "NULLABLE" },
+    { name = "status", type = "STRING", mode = "NULLABLE" },
+    { name = "estimated_revenue", type = "FLOAT64", mode = "NULLABLE" },
+    { name = "probability", type = "FLOAT64", mode = "NULLABLE" },
+    { name = "created_at", type = "TIMESTAMP", mode = "NULLABLE" },
+  ])
+}
+
+resource "google_bigquery_table" "handoff_rate" {
+  dataset_id          = google_bigquery_dataset.analytics.dataset_id
+  table_id            = "handoff_rate"
+  deletion_protection = false
+
+  schema = jsonencode([
+    { name = "total_turns", type = "INT64", mode = "NULLABLE" },
+    { name = "handoff_turns", type = "INT64", mode = "NULLABLE" },
+  ])
+}
+
+resource "google_bigquery_table" "v_lead_conversion" {
+  dataset_id          = google_bigquery_dataset.analytics.dataset_id
+  table_id            = "v_lead_conversion"
+  deletion_protection = false
+
+  view {
+    use_legacy_sql = false
+    query          = <<-SQL
+      SELECT status, COUNT(*) AS leads
+      FROM `${var.project_id}.${google_bigquery_dataset.analytics.dataset_id}.lead_funnel`
+      GROUP BY status
+    SQL
+  }
+
+  depends_on = [google_bigquery_table.lead_funnel]
+}
+
+resource "google_bigquery_table" "v_opportunity_pipeline" {
+  dataset_id          = google_bigquery_dataset.analytics.dataset_id
+  table_id            = "v_opportunity_pipeline"
+  deletion_protection = false
+
+  view {
+    use_legacy_sql = false
+    query          = <<-SQL
+      SELECT opportunity_type, SUM(estimated_revenue) AS pipeline_usd
+      FROM `${var.project_id}.${google_bigquery_dataset.analytics.dataset_id}.opportunity_summary`
+      WHERE status = 'OPEN'
+      GROUP BY opportunity_type
+    SQL
+  }
+
+  depends_on = [google_bigquery_table.opportunity_summary]
+}
+
+resource "google_bigquery_table" "v_opportunity_conversion" {
+  dataset_id          = google_bigquery_dataset.analytics.dataset_id
+  table_id            = "v_opportunity_conversion"
+  deletion_protection = false
+
+  view {
+    use_legacy_sql = false
+    query          = <<-SQL
+      SELECT
+        opportunity_type,
+        SAFE_DIVIDE(COUNTIF(status = 'CONVERTED'), COUNT(*)) AS conversion_rate
+      FROM `${var.project_id}.${google_bigquery_dataset.analytics.dataset_id}.opportunity_summary`
+      GROUP BY opportunity_type
+    SQL
+  }
+
+  depends_on = [google_bigquery_table.opportunity_summary]
+}
+
 resource "google_bigquery_table" "v_revenue_summary" {
   dataset_id          = google_bigquery_dataset.analytics.dataset_id
   table_id            = "v_revenue_summary"
