@@ -12,10 +12,12 @@ COPY src ./src
 # (RUN_CONSUMER=1, ADR-047); [llm] pulls google-genai for the real Vertex path
 # (LLM_STUB=0, ADR-049); [observability] pulls the OTel Cloud Trace exporter
 # (TRACER_SINK=otel, ADR-056); [analytics] pulls google-cloud-bigquery for the
-# revenue/cost sync batch job (revenueflow-analytics-sync, ADR-061). Without
+# revenue/cost sync batch job (revenueflow-analytics-sync, ADR-061); [mcp]
+# pulls the MCP SDK for the public read-only HTTP server
+# (revenueflow-mcp-readonly, ADR-067) — same image, different command. Without
 # them run_subscriber() / model calls / span export / scripts/sync_analytics.py
-# die.
-RUN pip install --upgrade pip && pip install -e ".[events,llm,observability,analytics]"
+# / scripts/mcp_http_server.py die.
+RUN pip install --upgrade pip && pip install -e ".[events,llm,observability,analytics,mcp]"
 
 COPY migrations ./migrations
 COPY seeds ./seeds
