@@ -29,6 +29,10 @@ locals {
     "roles/logging.admin",    # google_logging_metric (ADR-056)
     "roles/monitoring.admin", # google_monitoring_dashboard/alert_policy (ADR-056)
     "roles/compute.admin",    # global LB: address/url_map/proxy/forwarding_rule (ADR-060/068)
+    # Found in a second failed apply attempt (still missing after the first
+    # round of this same fix, ADR-069): google_bigquery_dataset.analytics
+    # (ADR-061) needs bigquery.datasets.create too.
+    "roles/bigquery.admin",
   ])
 }
 
