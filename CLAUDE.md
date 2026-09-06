@@ -234,6 +234,17 @@ Fatias entregues, arquivadas em `.claude/sdd/archive/`:
   "Web application" no Google Cloud Console (origem JavaScript = URL do portal) e preencher
   `PORTAL_GOOGLE_CLIENT_ID` via `gcloud secrets versions add` — mesmo padrão dos secrets manuais do
   WhatsApp.
+- **SUBDOMAINS** (2026-09-06, ADR-074) — `mcp.mastavista.com.br`/`portal.mastavista.com.br`
+  pedidos explicitamente pelo usuário, extensão aditiva do ADR-068 (mesmo IP/Load Balancer/
+  certificado, nenhum recurso recriado além do certificado em si). `infra/terraform/subdomains.tf`
+  (novo): 1 `google_compute_region_network_endpoint_group` (`SERVERLESS`) + 1
+  `google_compute_backend_service` por serviço (`mcp_readonly`, `portal`) — padrão oficial do GCP
+  pra Cloud Run atrás de um HTTP(S) Load Balancer. `landing_page.tf`: `host_rule`/`path_matcher`
+  novos no `google_compute_url_map.landing` já existente (`default_service` — a landing page —
+  inalterado); `domains` do certificado gerenciado ganha os 2 subdomínios (campo imutável,
+  certificado recriado — usuário confirmou aceitar a janela de reprovisionamento antes da
+  implementação). `outputs.tf` += `mcp_domain_url`/`portal_domain_url`. Pendência operacional
+  nova: 2 registros DNS A (`mcp`/`portal`) → mesmo `landing_page_ip`.
 
 Deploy: **auditoria em 2026-09-05 (ADR-069 a 072) achou que nenhum deploy real tinha rodado desde
 CUSTOMER_360 (2026-09-03)** — o ambiente GitHub `production` tem um gate de aprovação manual
@@ -250,17 +261,34 @@ porque `value_extractor` só é legal em métrica `DISTRIBUTION`; corrigido de v
 em vez de "total na hora", documentado nos próprios alertas). Um `apply` real já criou a maior
 parte da infraestrutura (Load Balancer da landing page, BigQuery, Cloud Run
 `revenueflow-mcp-readonly` rodando com sucesso) — só os 2 alertas de custo/falha de ferramenta
-ficaram pendentes de confirmação depois do fix do ADR-072. Pendências operacionais: aprovar/rodar o
-próximo deploy no ambiente `production` até fechar sem erro, então: apontar o registro A de
-`mastavista.com.br` pro `landing_page_ip` e conferir `landing_page_cert_check` até `ACTIVE`,
-valores reais dos secrets do WhatsApp, registro do webhook no Meta,
-`gcloud run jobs execute revenueflow-api-migrate` para aplicar `0005`–`0014`, popular
+ficaram pendentes de confirmação depois do fix do ADR-072 — **confirmado**: os 5 alertas do
+Monitoring estão ativos em produção (`gcloud alpha monitoring policies list`). DNS de
+`mastavista.com.br` também **já resolve certo** (`34.49.128.234`) e o certificado gerenciado está
+`ACTIVE` — HTTPS da landing page está de fato no ar.
+
+**Incidente 2026-09-06** (achado e corrigido na sessão seguinte): o merge do PORTAL (ADR-073)
+adicionou `PORTAL_GOOGLE_CLIENT_ID` a `manual_secrets`, que o `cloud_run.tf` monta em TODO serviço
+(inclusive a API principal, que não usa esse secret) via `local.runtime_secret_env` — sem
+`gcloud secrets versions add` prévio (a etapa manual que o comentário de `secrets.tf` já exige
+antes do 1º deploy saudável), isso quebrou o deploy da API principal por ~15h (produção continuou
+servindo a revisão anterior o tempo todo — nunca caiu, só os deploys novos ficaram bloqueados).
+Corrigido com um valor placeholder no secret; o `revenueflow-api-portal` também subiu com sucesso
+pela primeira vez no mesmo deploy. **Risco latente não corrigido**: qualquer secret manual novo
+adicionado por uma fatia futura vai repetir esse mesmo bloqueio se ninguém popular o valor antes do
+próximo deploy — vale considerar, como follow-up, escopar `runtime_secret_env` só aos secrets que a
+API principal realmente usa, em vez do mapa inteiro de `manual_secrets`.
+
+Pendências operacionais: valores reais dos secrets do WhatsApp (✅ já preenchidos e confirmados
+funcionando via handshake do webhook), registro do webhook no Meta (✅ handshake confirmado nos
+logs), `gcloud run jobs execute revenueflow-api-migrate` para aplicar `0006`–`0014` (rodou em
+2026-09-02, antes da maioria destas migrations existirem — precisa rodar de novo), popular
 `consent_opt_in_at` de clientes reais antes de rodar `revenueflow-campaign-run` em produção,
 `gcloud run jobs execute revenueflow-analytics-sync` para o primeiro sync do BigQuery, preencher
-as GitHub Actions repo variables `ALERT_EMAIL`/`DASHBOARD_VIEWER_EMAILS` (`gh variable set` —
-`terraform.yml` já as encaminha pro `plan`/`apply`, `[]` se ausente), e distribuir o valor de
-`gcloud secrets versions access latest --secret=revenueflow-mcp-api-token` + `mcp_readonly_url`
-(output do Terraform) pra quem for usar o MCP público de leitura.
+`ALERT_EMAIL` nas GitHub Actions repo variables (`DASHBOARD_VIEWER_EMAILS` ✅ já preenchida),
+distribuir o valor de `gcloud secrets versions access latest --secret=revenueflow-mcp-api-token` +
+`mcp_readonly_url` pra quem for usar o MCP público, criar o OAuth Client ID do portal (ver bullet
+PORTAL acima), e apontar os 2 registros DNS A novos do ADR-074
+(`mcp`/`portal.mastavista.com.br` → `landing_page_ip`).
 
 O código de aplicação **existe** e não é mais scaffolding.
 
@@ -571,3 +599,4 @@ Claude deve localizar e ler os documentos relacionados antes de implementar.
 - [ADR-071 — ALIGN_SUM não escalariza métrica DISTRIBUTION: métricas gêmeas pra alerta](docs/adrs/adr-071-distribution-metric-alert-sum-fix.md)
 - [ADR-072 — Correção do ADR-071: value_extractor só existe pra métrica DISTRIBUTION](docs/adrs/adr-072-value-extractor-requires-distribution.md)
 - [ADR-073 — Portal operacional: Google Sign-In + wrapper sobre rotas internas + painel ao vivo via Postgres LISTEN/NOTIFY](docs/adrs/adr-073-operational-portal.md)
+- [ADR-074 — Subdomínios mcp./portal. via Serverless NEG no mesmo Load Balancer (ADR-068 estendido)](docs/adrs/adr-074-mcp-and-portal-subdomains.md)

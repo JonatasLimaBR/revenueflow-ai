@@ -35,6 +35,40 @@ resource "google_compute_global_address" "landing" {
 resource "google_compute_url_map" "landing" {
   name            = "${var.service_name}-landing-map"
   default_service = google_compute_backend_bucket.landing.id
+
+  # mcp.<domain> / portal.<domain> host-based routing (subdomains.tf) — the
+  # bare domain keeps hitting the bucket above via default_service.
+  dynamic "host_rule" {
+    for_each = var.landing_domain != "" ? [1] : []
+    content {
+      hosts        = [local.mcp_subdomain]
+      path_matcher = "mcp"
+    }
+  }
+
+  dynamic "path_matcher" {
+    for_each = var.landing_domain != "" ? [1] : []
+    content {
+      name            = "mcp"
+      default_service = google_compute_backend_service.mcp_readonly[0].id
+    }
+  }
+
+  dynamic "host_rule" {
+    for_each = var.landing_domain != "" ? [1] : []
+    content {
+      hosts        = [local.portal_subdomain]
+      path_matcher = "portal"
+    }
+  }
+
+  dynamic "path_matcher" {
+    for_each = var.landing_domain != "" ? [1] : []
+    content {
+      name            = "portal"
+      default_service = google_compute_backend_service.portal[0].id
+    }
+  }
 }
 
 resource "google_compute_target_http_proxy" "landing" {
@@ -65,7 +99,7 @@ resource "google_compute_managed_ssl_certificate" "landing" {
   name = "${var.service_name}-landing-cert"
 
   managed {
-    domains = [var.landing_domain]
+    domains = compact([var.landing_domain, local.mcp_subdomain, local.portal_subdomain])
   }
 }
 
