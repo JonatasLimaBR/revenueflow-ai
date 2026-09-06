@@ -292,6 +292,15 @@ padrão da fixture `db` dos testes); verificado rodando de verdade contra Postgr
 no BigQuery real). Risco latente: nenhum desses 4 scripts tinha teste próprio, só os `services.*`
 subjacentes — o bug só apareceu rodando de verdade.
 
+**Incidente 2026-09-06 (nº3)**: o fix acima (PR #74) mergeou em `main` mas **nunca chegou a
+produção sozinho** — o `path` do trigger `push` do `.github/workflows/terraform.yml` (que builda e
+sobe a imagem Docker nova a cada push) cobria `src/**`/`Dockerfile`/`pyproject.toml`, mas não
+`scripts/**`/`migrations/**`/`seeds/**`, apesar dos 3 serem `COPY`ados pro container (`Dockerfile`).
+Um PR que só toca `scripts/` passa no CI e mergeia, mas a imagem em produção nunca é reconstruída —
+só um push futuro que toque `src/**` "carregaria" o fix, por acidente. Corrigido adicionando os 3
+diretórios ao filtro; teste novo (`test_ci_workflow.py`) trava os dois lados um contra o outro
+(todo `COPY` do Dockerfile precisa estar no filtro do trigger) pra não regredir de novo.
+
 Pendências operacionais: valores reais dos secrets do WhatsApp (✅ preenchidos, handshake do
 webhook confirmado), registro do webhook no Meta (✅ confirmado nos logs), migração do banco (✅
 `0006`–`0014` aplicadas em 2026-09-06), DNS dos subdomínios do ADR-074 (✅ `mcp`/

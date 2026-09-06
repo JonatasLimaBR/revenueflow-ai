@@ -12,10 +12,17 @@ on:
       - "infra/terraform/**"
       - ".github/workflows/terraform.yml"
       - "site/**"
-      # The deploy job builds and pushes the image, so image inputs must redeploy.
+      # The deploy job builds and pushes the image, so every input the
+      # Dockerfile COPYs must redeploy — src/ alone missed scripts/,
+      # migrations/ and seeds/ (all COPYed too), so a scripts-only fix could
+      # merge to main and never actually reach the built image (confirmed
+      # live: PR #74's batch-script pool fix).
       - "Dockerfile"
       - "pyproject.toml"
       - "src/**"
+      - "scripts/**"
+      - "migrations/**"
+      - "seeds/**"
   workflow_dispatch:
 
 permissions:
