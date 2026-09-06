@@ -244,7 +244,11 @@ Fatias entregues, arquivadas em `.claude/sdd/archive/`:
   inalterado); `domains` do certificado gerenciado ganha os 2 subdomínios (campo imutável,
   certificado recriado — usuário confirmou aceitar a janela de reprovisionamento antes da
   implementação). `outputs.tf` += `mcp_domain_url`/`portal_domain_url`. Pendência operacional
-  nova: 2 registros DNS A (`mcp`/`portal`) → mesmo `landing_page_ip`.
+  nova: 2 registros DNS A (`mcp`/`portal`) → mesmo `landing_page_ip`. **Correção pós-merge**: o
+  primeiro `apply` real falhou (`resourceInUseByAnotherResource` — Terraform tentou destruir o
+  certificado antigo antes de criar o novo); corrigido com `lifecycle { create_before_destroy =
+  true }` + nome do certificado derivado de um hash dos domínios (senão colidiria com o nome fixo
+  do antigo durante a transição).
 
 Deploy: **auditoria em 2026-09-05 (ADR-069 a 072) achou que nenhum deploy real tinha rodado desde
 CUSTOMER_360 (2026-09-03)** — o ambiente GitHub `production` tem um gate de aprovação manual

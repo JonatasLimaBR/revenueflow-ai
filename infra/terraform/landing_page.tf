@@ -96,10 +96,23 @@ resource "google_compute_global_forwarding_rule" "landing" {
 resource "google_compute_managed_ssl_certificate" "landing" {
   count = var.landing_domain != "" ? 1 : 0
 
-  name = "${var.service_name}-landing-cert"
+  # Name includes a short hash of the domain list: `domains` forces
+  # replacement (immutable field), and without a name that also changes,
+  # create_before_destroy below fails with "name already in use" — the old
+  # cert (same fixed name) isn't gone yet when GCP tries to create the new
+  # one. A stable literal name only ever worked because domains never
+  # changed before (ADR-068); now that it does (ADR-074), the name has to
+  # change in lockstep. Confirmed live: without this, `terraform apply`
+  # fails destroying the old cert first ("resourceInUseByAnotherResource",
+  # since the HTTPS proxy still references it) — the real bug this fixes.
+  name = "${var.service_name}-landing-cert-${substr(sha1(join(",", compact([var.landing_domain, local.mcp_subdomain, local.portal_subdomain]))), 0, 8)}"
 
   managed {
     domains = compact([var.landing_domain, local.mcp_subdomain, local.portal_subdomain])
+  }
+
+  lifecycle {
+    create_before_destroy = true
   }
 }
 

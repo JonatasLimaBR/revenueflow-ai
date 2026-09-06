@@ -40,3 +40,20 @@ def test_managed_cert_covers_root_domain_and_subdomains() -> None:
         "domains = compact([var.landing_domain, local.mcp_subdomain, local.portal_subdomain])"
         in block
     )
+
+
+def test_managed_cert_uses_create_before_destroy_with_a_dynamic_name() -> None:
+    # Real production failure (2026-09-06): `domains` forces replacement, and
+    # without create_before_destroy Terraform destroys the old cert first —
+    # GCP rejects that with resourceInUseByAnotherResource because the HTTPS
+    # proxy still references it. create_before_destroy alone isn't enough
+    # either: the name must also change whenever domains changes, or the new
+    # cert collides with the old one's still-live name. Both together are the
+    # fix — regression-test each half.
+    body = (_TF / "landing_page.tf").read_text()
+    block = body.split('resource "google_compute_managed_ssl_certificate" "landing"', 1)[1].split(
+        "\nresource ", 1
+    )[0]
+    assert "create_before_destroy = true" in block
+    assert "sha1(join(" in block
+    assert 'name = "${var.service_name}-landing-cert"' not in block
