@@ -282,17 +282,26 @@ adicionado por uma fatia futura vai repetir esse mesmo bloqueio se ninguém popu
 próximo deploy — vale considerar, como follow-up, escopar `runtime_secret_env` só aos secrets que a
 API principal realmente usa, em vez do mapa inteiro de `manual_secrets`.
 
-Pendências operacionais: valores reais dos secrets do WhatsApp (✅ já preenchidos e confirmados
-funcionando via handshake do webhook), registro do webhook no Meta (✅ handshake confirmado nos
-logs), `gcloud run jobs execute revenueflow-api-migrate` para aplicar `0006`–`0014` (rodou em
-2026-09-02, antes da maioria destas migrations existirem — precisa rodar de novo), popular
-`consent_opt_in_at` de clientes reais antes de rodar `revenueflow-campaign-run` em produção,
-`gcloud run jobs execute revenueflow-analytics-sync` para o primeiro sync do BigQuery, preencher
-`ALERT_EMAIL` nas GitHub Actions repo variables (`DASHBOARD_VIEWER_EMAILS` ✅ já preenchida),
-distribuir o valor de `gcloud secrets versions access latest --secret=revenueflow-mcp-api-token` +
-`mcp_readonly_url` pra quem for usar o MCP público, criar o OAuth Client ID do portal (ver bullet
-PORTAL acima), e apontar os 2 registros DNS A novos do ADR-074
-(`mcp`/`portal.mastavista.com.br` → `landing_page_ip`).
+**Incidente 2026-09-06 (nº2)**: a primeira execução real de qualquer um dos 4 jobs batch
+(`opportunity-scan`/`campaign-run`/`lead-sweep`/`analytics-sync` — nenhum tinha rodado em produção
+antes de hoje) revelou que os 4 scripts (`scripts/detect_opportunities.py` e companhia) nunca
+chamavam `open_pool()` antes de usar o pool de conexões — `psycopg_pool.PoolClosed` em toda
+tentativa. Corrigido nos 4 (`open_pool()`/`close_pool()` ao redor da chamada do serviço, mesmo
+padrão da fixture `db` dos testes); verificado rodando de verdade contra Postgres real localmente
+(3 dos 4 — `sync_analytics.py` só confirmado até a abertura do pool, pra não gravar dado de teste
+no BigQuery real). Risco latente: nenhum desses 4 scripts tinha teste próprio, só os `services.*`
+subjacentes — o bug só apareceu rodando de verdade.
+
+Pendências operacionais: valores reais dos secrets do WhatsApp (✅ preenchidos, handshake do
+webhook confirmado), registro do webhook no Meta (✅ confirmado nos logs), migração do banco (✅
+`0006`–`0014` aplicadas em 2026-09-06), DNS dos subdomínios do ADR-074 (✅ `mcp`/
+`portal.mastavista.com.br` já resolvem — falta só o certificado sair de `PROVISIONING`), `gcloud
+run jobs execute revenueflow-api-opportunity-scan`/`-lead-sweep`/`-analytics-sync` (rodar pela
+1ª vez depois do fix do pool acima — `campaign-run` já rodou, mas sem efeito real ainda: nenhum
+cliente tem `consent_opt_in_at`), popular `consent_opt_in_at` de clientes reais, preencher
+`ALERT_EMAIL` nas GitHub Actions repo variables (`DASHBOARD_VIEWER_EMAILS` ✅ preenchida),
+distribuir o valor de `gcloud secrets versions access latest --secret=revenueflow-mcp-api-token`
+pra quem for usar o MCP público, e criar o OAuth Client ID do portal (ver bullet PORTAL acima).
 
 O código de aplicação **existe** e não é mais scaffolding.
 
