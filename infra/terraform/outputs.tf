@@ -66,3 +66,13 @@ output "portal_url" {
   description = "Operational portal URL (ADR-073) — /portal/login; requires PORTAL_GOOGLE_CLIENT_ID configured and the visitor's email in dashboard_viewer_emails"
   value       = google_cloud_run_v2_service.portal.uri
 }
+
+output "mcp_domain_url" {
+  description = "MCP público via domínio próprio (subdomínio), depois de apontar o DNS e o cert ficar ACTIVE — vazio se var.landing_domain não estiver configurado"
+  value       = var.landing_domain != "" ? "https://${local.mcp_subdomain}" : ""
+}
+
+output "portal_domain_url" {
+  description = "Portal via domínio próprio (subdomínio), depois de apontar o DNS e o cert ficar ACTIVE — vazio se var.landing_domain não estiver configurado"
+  value       = var.landing_domain != "" ? "https://${local.portal_subdomain}" : ""
+}

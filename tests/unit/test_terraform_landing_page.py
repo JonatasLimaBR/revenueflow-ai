@@ -30,7 +30,13 @@ def test_http_proxy_redirects_to_https_when_domain_set() -> None:
     assert "google_compute_url_map.landing.id" in block
 
 
-def test_managed_cert_scoped_to_landing_domain_only() -> None:
+def test_managed_cert_covers_root_domain_and_subdomains() -> None:
+    # Extended (SUBDOMAINS) to also cover mcp./portal. — still just the
+    # domains this deploy actually configures, via compact(), never a
+    # hardcoded or unrelated domain.
     body = (_TF / "landing_page.tf").read_text()
     block = body.split('resource "google_compute_managed_ssl_certificate" "landing"', 1)[1]
-    assert "domains = [var.landing_domain]" in block
+    assert (
+        "domains = compact([var.landing_domain, local.mcp_subdomain, local.portal_subdomain])"
+        in block
+    )
