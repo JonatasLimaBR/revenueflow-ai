@@ -301,16 +301,61 @@ só um push futuro que toque `src/**` "carregaria" o fix, por acidente. Corrigid
 diretórios ao filtro; teste novo (`test_ci_workflow.py`) trava os dois lados um contra o outro
 (todo `COPY` do Dockerfile precisa estar no filtro do trigger) pra não regredir de novo.
 
-Pendências operacionais: valores reais dos secrets do WhatsApp (✅ preenchidos, handshake do
-webhook confirmado), registro do webhook no Meta (✅ confirmado nos logs), migração do banco (✅
-`0006`–`0014` aplicadas em 2026-09-06), DNS dos subdomínios do ADR-074 (✅ `mcp`/
-`portal.mastavista.com.br` já resolvem — falta só o certificado sair de `PROVISIONING`), `gcloud
-run jobs execute revenueflow-api-opportunity-scan`/`-lead-sweep`/`-analytics-sync` (rodar pela
-1ª vez depois do fix do pool acima — `campaign-run` já rodou, mas sem efeito real ainda: nenhum
-cliente tem `consent_opt_in_at`), popular `consent_opt_in_at` de clientes reais, preencher
-`ALERT_EMAIL` nas GitHub Actions repo variables (`DASHBOARD_VIEWER_EMAILS` ✅ preenchida),
-distribuir o valor de `gcloud secrets versions access latest --secret=revenueflow-mcp-api-token`
-pra quem for usar o MCP público, e criar o OAuth Client ID do portal (ver bullet PORTAL acima).
+**Incidente 2026-09-07**: teste end-to-end real do CTA de WhatsApp da landing page revelou uma
+cadeia de 4 problemas independentes, cada um mascarando o próximo — nenhuma mensagem real de
+cliente jamais tinha percorrido o fluxo completo em produção até este dia:
+1. **Número errado no CTA** (`5519982499116`, nunca confirmado — o próprio ADR-066 já registrava
+   isso). Corrigido pro número real (`+1 555-202-7113`, número de teste do Meta, confirmado via
+   Graph API `display_phone_number`); mensagem pré-preenchida passou a citar um produto real do
+   catálogo. Addendum no ADR-066.
+2. **Access token do WhatsApp expirado** (token temporário do painel de teste, ~24h de validade).
+   Substituído por um token de usuário de sistema sem expiração (Business Settings → Usuários do
+   sistema), gravado em `revenueflow-whatsapp-access-token` + force-redeploy do Cloud Run pra
+   pegar o valor novo (mesma pegadinha do `version="latest"` de sempre).
+3. **A WABA nunca esteve inscrita no app da aplicação** (`POST /{waba-id}/subscribed_apps`) — só
+   estava inscrita no app interno de teste do Meta (`WA DevX Webhook Events 1P App`). Mesmo com
+   webhook verificado e campo `messages` assinado, nenhuma chamada chegava. Corrigido chamando a
+   mesma rota com o token do usuário de sistema (idempotente, sem infra/deploy).
+4. **Bug real de código, achado só depois de instrumentar o webhook com um log de diagnóstico
+   (PR #79, sem PII — só a forma do payload)**: `events/publisher.py::_default_publisher()` tinha
+   os dois ramos do `if/else` retornando `InMemoryPublisher()` — o ramo que deveria escolher
+   `PubSubPublisher()` pra projetos GCP reais nunca foi escrito, apesar do docstring do módulo já
+   sinalizar isso como pendente ("for now"). **Toda mensagem inbound, em produção, desde que a
+   fatia `WHATSAPP_INBOUND_SLICE` foi construída (ADR-044), era publicada numa lista em memória
+   descartada no fim da requisição** — o tópico real do Pub/Sub nunca recebia nada, o subscriber
+   (que corretamente usa `pubsub_v1.SubscriberClient` contra o tópico real) nunca tinha o que
+   processar, e nenhuma resposta jamais foi enviada. Corrigido (PR #80) + 2 testes de regressão
+   travando a seleção do publisher por `pubsub_project_id`.
+
+Depois do fix #4, o teste end-to-end **funcionou de ponta a ponta pela primeira vez**: webhook →
+Pub/Sub real → subscriber → grafo (Gemini real, `LLM_STUB=0` confirmado) → `ChannelOutbound.send`
+→ mensagem entregue no WhatsApp do usuário. Achado colateral: o primeiro turno real levou ~4min
+entre o webhook aceitar e o subscriber processar, e o processamento em si estourou o
+`turn_budget_s=15` (ADR-057) — usuário recebeu o `_SLOW_REPLY` fixo em vez da recomendação real.
+Não investigado a fundo ainda (hipótese: warm-up de cliente Vertex/pool de conexão no primeiro
+turno real da instância) — acompanhar se turnos seguintes normalizam.
+
+**Achado à parte, não relacionado ao WhatsApp**: `TRACER_SINK` em produção está `noop`, não `otel`
+como o bullet OBSERVABILITY_OPS abaixo afirma — o `ADR-056` nunca chegou a ser de fato aplicado no
+`terraform.tfvars` real (só no `.tfvars.example`). Cloud Trace confirmado vazio (`gcloud alpha
+trace`/API REST, zero traces no dia). Usuário quer **Langfuse** em produção (não OTel/Cloud
+Trace) — pendente: subir uma instância de Langfuse self-hosted em produção (hoje só roda local via
+`docker-compose.yml`) e apontar `TRACER_SINK=langfuse` + as 3 vars `LANGFUSE_*`. Ver bullet
+OBSERVABILITY_OPS — a frase "produção passa a `TRACER_SINK=otel`" ali está desatualizada/nunca foi
+verdade na prática; não corrigida ainda no bullet original, só registrada aqui.
+
+Pendências operacionais: valores reais dos secrets do WhatsApp (✅ preenchidos e token permanente
+gerado 2026-09-07), registro do webhook no Meta (✅ confirmado, incl. inscrição da WABA no app —
+2026-09-07), migração do banco (✅ `0006`–`0014` aplicadas em 2026-09-06), DNS dos subdomínios do
+ADR-074 (✅ `mcp`/`portal.mastavista.com.br` já resolvem — falta só o certificado sair de
+`PROVISIONING`), `gcloud run jobs execute revenueflow-api-opportunity-scan`/`-lead-sweep`/
+`-analytics-sync` (rodar pela 1ª vez depois do fix do pool acima — `campaign-run` já rodou, mas
+sem efeito real ainda: nenhum cliente tem `consent_opt_in_at`), popular `consent_opt_in_at` de
+clientes reais, preencher `ALERT_EMAIL` nas GitHub Actions repo variables (`DASHBOARD_VIEWER_EMAILS`
+✅ preenchida), distribuir o valor de `gcloud secrets versions access latest
+--secret=revenueflow-mcp-api-token` pra quem for usar o MCP público, criar o OAuth Client ID do
+portal (ver bullet PORTAL acima), subir Langfuse em produção (ver achado acima), e investigar a
+latência do primeiro turno real (~4min webhook→subscriber + estouro de `turn_budget_s`).
 
 O código de aplicação **existe** e não é mais scaffolding.
 
