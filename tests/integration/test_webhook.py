@@ -1,5 +1,7 @@
+import logging
 from collections.abc import Callable
 
+import pytest
 from asgi_lifespan import LifespanManager
 from httpx import ASGITransport, AsyncClient
 
@@ -54,6 +56,36 @@ async def test_post_wrong_signature_rejected(
 
     assert resp.status_code == 403
     assert publisher.published == []
+
+
+async def test_post_status_callback_logs_shape_without_publishing(
+    db: None,
+    whatsapp_settings: str,
+    publisher: InMemoryPublisher,
+    signed_status_webhook: Callable[[], tuple[bytes, str]],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A delivery-status callback (no ``messages`` key) produces zero events —
+    silently, by design (whatsapp_inbound.py) — but must still be visible in
+    logs so a missing inbound message isn't indistinguishable from Meta never
+    calling the webhook at all (found live: a real inbound message never
+    reached the graph because only status callbacks were arriving)."""
+    body, signature = signed_status_webhook()
+    with caplog.at_level(logging.INFO, logger="revenueflow.api.webhook"):
+        async with (
+            LifespanManager(app),
+            AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client,
+        ):
+            resp = await client.post(
+                "/webhook/whatsapp",
+                content=body,
+                headers={"X-Hub-Signature-256": signature},
+            )
+
+    assert resp.status_code == 202
+    assert publisher.published == []
+    assert any("events=0" in r.message for r in caplog.records)
+    assert not any("5511999999999" in r.message for r in caplog.records)
 
 
 async def test_get_verify_handshake(db: None, whatsapp_settings: str) -> None:

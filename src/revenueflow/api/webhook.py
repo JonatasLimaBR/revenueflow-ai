@@ -8,6 +8,8 @@ returns fast (``202``) and leaves the turn work to the consumer.
 
 from __future__ import annotations
 
+import json
+import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Query, Request, Response
@@ -19,6 +21,21 @@ from revenueflow.domain.errors import ChannelError
 from revenueflow.services import ingest_message
 
 router = APIRouter(prefix="/webhook", tags=["webhook"])
+_LOGGER = logging.getLogger(__name__)
+
+
+def _payload_shape(raw: bytes) -> list[dict[str, object]]:
+    """Field names present per change, no PII (no phone/message content)."""
+
+    try:
+        body = json.loads(raw)
+        return [
+            {"field": c.get("field"), "value_keys": sorted((c.get("value") or {}).keys())}
+            for e in body.get("entry", [])
+            for c in e.get("changes", [])
+        ]
+    except (TypeError, ValueError, AttributeError):
+        return []
 
 
 @router.get("/whatsapp")
@@ -50,6 +67,11 @@ async def receive(request: Request) -> Response:
         events = parse_inbound(raw)
     except ChannelError:
         return Response(status_code=400)
+    _LOGGER.info(
+        "whatsapp webhook received: shape=%s events=%d",
+        _payload_shape(raw),
+        len(events),
+    )
     for event in events:
         await ingest_message(event)
     return JSONResponse({"status": "accepted"}, status_code=202)
