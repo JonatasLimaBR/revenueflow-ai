@@ -75,3 +75,17 @@ produção.
 Mudanças nesta decisão — em especial adicionar coleta de dado/analytics ao clique, trocar o deep
 link por um formulário com backend próprio, ou mover o número pra uma variável de infraestrutura —
 exigem novo ADR ou superseding ADR.
+
+## Correção pós-merge (2026-09-07)
+O número `5519982499116` nunca foi o número real — era o palpite `+55` documentado como não
+confirmado acima. O número de fato vinculado ao `WHATSAPP_PHONE_NUMBER_ID` é o **número de teste
+do Meta**, `+1 555-202-7113` (confirmado via `GET /{phone_number_id}?fields=display_phone_number`
+na Graph API). Corrigido nos 3 CTAs; a mensagem pré-preenchida também passou a citar um produto
+real do catálogo (`Bomba d'água centrífuga 1CV 220V`) em vez de um texto genérico, pra engatar o
+fluxo de recomendação/preço de verdade a partir do clique.
+
+**Limitação herdada, não introduzida por este fix**: por ser o número de teste (modo
+desenvolvimento do app Meta), só telefones cadastrados manualmente como destinatário de teste no
+painel do app recebem resposta — um visitante real da landing page que não esteja nessa lista
+consegue *enviar* a mensagem, mas não recebe retorno do agente. Migrar pra um número de produção
+verificado (Business Verification do Meta) é um follow-up separado, fora do escopo desta correção.
