@@ -139,15 +139,31 @@ async def gemini_text(*, system: str, user: str, model: str) -> str:
     return await _gemini_text_real(system=system, user=user, model=model)
 
 
-def _vertex_client() -> Any:
-    from google import genai
+_client: Any | None = None
 
-    settings = get_settings()
-    return genai.Client(
-        vertexai=True,
-        project=settings.google_cloud_project or None,
-        location=settings.vertex_location,
-    )
+
+def _vertex_client() -> Any:
+    """Return a process-wide cached ``genai.Client``.
+
+    Constructing a fresh client per call — the previous behavior — resolves
+    ADC credentials synchronously on the event loop on every single LLM call
+    (both retry attempts *and* every graph node), outside the
+    ``llm_call_timeout_s``/``asyncio.wait_for`` wrapper around the actual
+    request. Found live: a turn recorded a 239s ``classify_intent`` latency —
+    the client build, not the model call, was the thing hanging.
+    """
+
+    global _client
+    if _client is None:
+        from google import genai
+
+        settings = get_settings()
+        _client = genai.Client(
+            vertexai=True,
+            project=settings.google_cloud_project or None,
+            location=settings.vertex_location,
+        )
+    return _client
 
 
 def _is_transient(exc: BaseException) -> bool:
