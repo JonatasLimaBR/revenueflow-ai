@@ -1,20 +1,32 @@
 {% extends "base.html" %}
+{% import "_icons.html" as icons %}
 {% block title %} — Handoffs{% endblock %}
 {% block content %}
-<h1 style="font-size:1.3rem;">Handoffs pendentes</h1>
+<h1 class="page-title">Handoffs pendentes</h1>
+<p class="page-sub">Conversas transferidas para um atendente humano.</p>
 {% if handoffs %}
 {% for h in handoffs %}
-<div class="card" style="margin-bottom:1rem;">
-  <p><strong>{{ h.handoff_id }}</strong> · conversa {{ h.conversation_id }} · motivo <span class="pill">{{ h.reason }}</span></p>
-  <p style="color:var(--muted); font-size:0.85rem;">criado em {{ h.created_at or "—" }}</p>
-  <details><summary>contexto</summary><pre style="white-space:pre-wrap; font-size:0.8rem;">{{ h.context | tojson(indent=2) }}</pre></details>
-  <form method="post" action="/portal/handoffs/{{ h.handoff_id }}">
-    <button type="submit">Marcar como resolvido</button>
-  </form>
+<div class="card" style="margin-bottom:1rem; display:flex; gap:1rem; align-items:flex-start;">
+  <span class="kpi" style="flex-shrink:0;"><span class="badge">{{ icons.life_buoy(18) }}</span></span>
+  <div style="flex:1; min-width:0;">
+    <p style="margin:0 0 0.35rem;">
+      <span class="mono" style="font-weight:600;">{{ h.handoff_id }}</span>
+      · conversa <span class="mono">{{ h.conversation_id }}</span>
+      · motivo <span class="pill bad">{{ h.reason }}</span>
+    </p>
+    <p style="color:var(--text-muted); font-size:0.85rem; margin:0 0 0.6rem;">criado em {{ h.created_at or "—" }}</p>
+    <details>
+      <summary style="cursor:pointer; color:var(--text-muted); font-size:0.85rem;">contexto</summary>
+      <pre style="white-space:pre-wrap; font-size:0.78rem; color:var(--text-muted); background:var(--bg-soft); border-radius:var(--radius-sm); padding:0.8rem; margin-top:0.6rem;">{{ h.context | tojson(indent=2) }}</pre>
+    </details>
+    <form method="post" action="/portal/handoffs/{{ h.handoff_id }}" style="margin-top:0.75rem;">
+      <button type="submit">{{ icons.check_circle(15) }}Marcar como resolvido</button>
+    </form>
+  </div>
 </div>
 {% endfor %}
 {% else %}
-<div class="card"><p class="empty">Nenhum handoff pendente.</p></div>
+<div class="card"><div class="empty">{{ icons.life_buoy(28) }}Nenhum handoff pendente.</div></div>
 {% endif %}
 {% endblock %}
 {% block autorefresh %}<script>setInterval(() => location.reload(), 30000);</script>{% endblock %}

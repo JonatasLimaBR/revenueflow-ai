@@ -1,37 +1,44 @@
 {% extends "base.html" %}
+{% import "_icons.html" as icons %}
 {% block title %} — Funil{% endblock %}
 {% block content %}
-<h1 style="font-size:1.3rem;">Funil de leads</h1>
+<h1 class="page-title">Funil de leads</h1>
+<p class="page-sub">Ciclo de vida do lead até virar cliente.</p>
 <div class="card" style="margin-bottom:1.5rem;">
 {% if leads %}
 <table>
-  <tr><th>Lead</th><th>Status</th><th>Criado em</th></tr>
+  <thead><tr><th>Lead</th><th>Status</th><th>Criado em</th></tr></thead>
+  <tbody>
   {% for l in leads %}
-  <tr><td>{{ l.lead_id }}</td><td><span class="pill">{{ l.status }}</span></td><td>{{ l.created_at }}</td></tr>
+  <tr><td class="mono">{{ l.lead_id }}</td><td><span class="pill {{ icons.status_class(l.status) }}">{{ l.status }}</span></td><td style="color:var(--text-muted);">{{ l.created_at }}</td></tr>
   {% endfor %}
+  </tbody>
 </table>
 {% else %}
-<p class="empty">Nenhum lead ainda.</p>
+<div class="empty">{{ icons.users(28) }}Nenhum lead ainda.</div>
 {% endif %}
 </div>
-<h1 style="font-size:1.3rem;">Oportunidades</h1>
+<h1 class="page-title" style="margin-top:2rem;">Oportunidades</h1>
+<p class="page-sub">Recompra atrasada e quotes paradas, geradas pelo Opportunity Engine.</p>
 <div class="card">
 {% if opportunities %}
 <table>
-  <tr><th>Oportunidade</th><th>Cliente</th><th>Tipo</th><th>Status</th><th>Receita estimada</th><th>Probabilidade</th></tr>
+  <thead><tr><th>Oportunidade</th><th>Cliente</th><th>Tipo</th><th>Status</th><th style="text-align:right;">Receita estimada</th><th style="text-align:right;">Probabilidade</th></tr></thead>
+  <tbody>
   {% for o in opportunities %}
   <tr>
-    <td>{{ o.opportunity_id }}</td>
-    <td>{{ o.customer_id }}</td>
+    <td class="mono">{{ o.opportunity_id }}</td>
+    <td class="mono">{{ o.customer_id }}</td>
     <td>{{ o.opportunity_type }}</td>
-    <td><span class="pill">{{ o.status }}</span></td>
-    <td>${{ "%.2f"|format(o.estimated_revenue|float) }}</td>
-    <td>{{ "%.0f"|format(o.probability * 100) }}%</td>
+    <td><span class="pill {{ icons.status_class(o.status) }}">{{ o.status }}</span></td>
+    <td class="mono" style="text-align:right; color:var(--gold);">${{ "%.2f"|format(o.estimated_revenue|float) }}</td>
+    <td class="mono" style="text-align:right;">{{ "%.0f"|format(o.probability * 100) }}%</td>
   </tr>
   {% endfor %}
+  </tbody>
 </table>
 {% else %}
-<p class="empty">Nenhuma oportunidade ainda.</p>
+<div class="empty">{{ icons.sparkles(28) }}Nenhuma oportunidade ainda.</div>
 {% endif %}
 </div>
 {% endblock %}

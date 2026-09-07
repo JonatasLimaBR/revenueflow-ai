@@ -1,24 +1,28 @@
 {% extends "base.html" %}
+{% import "_icons.html" as icons %}
 {% block title %} — Conversas{% endblock %}
 {% block content %}
-<h1 style="font-size:1.3rem;">Conversas recentes</h1>
+<h1 class="page-title">Conversas recentes</h1>
+<p class="page-sub">Sessões do WhatsApp em andamento e finalizadas.</p>
 <div class="card">
 {% if conversations %}
 <table>
-  <tr><th>Telefone</th><th>Status</th><th>Intent</th><th>Agente</th><th>Última interação</th><th></th></tr>
+  <thead><tr><th>Telefone</th><th>Status</th><th>Intent</th><th>Agente</th><th>Última interação</th><th></th></tr></thead>
+  <tbody>
   {% for c in conversations %}
   <tr>
-    <td>{{ c.phone }}</td>
-    <td><span class="pill">{{ c.status }}</span></td>
+    <td class="mono">{{ c.phone }}</td>
+    <td><span class="pill {{ icons.status_class(c.status) }}">{{ c.status }}</span></td>
     <td>{{ c.current_intent or "—" }}</td>
-    <td>{{ c.current_agent or "—" }}</td>
-    <td>{{ c.last_interaction }}</td>
-    <td><a href="/portal/conversations/{{ c.conversation_id }}">ver</a></td>
+    <td>{% if c.current_agent %}<span class="mono" style="color:var(--text-muted);">{{ c.current_agent }}</span>{% else %}—{% endif %}</td>
+    <td style="color:var(--text-muted);">{{ c.last_interaction }}</td>
+    <td><a class="link" href="/portal/conversations/{{ c.conversation_id }}">ver →</a></td>
   </tr>
   {% endfor %}
+  </tbody>
 </table>
 {% else %}
-<p class="empty">Nenhuma conversa ainda.</p>
+<div class="empty">{{ icons.chat(28) }}Nenhuma conversa ainda.</div>
 {% endif %}
 </div>
 {% endblock %}

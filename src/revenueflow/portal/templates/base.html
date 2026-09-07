@@ -1,52 +1,238 @@
 <!DOCTYPE html>
+{% import "_icons.html" as icons %}
 <html lang="pt-br">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>RevenueFlow Portal{% block title %}{% endblock %}</title>
 <style>
-  :root { color-scheme: light dark; --accent: #2563eb; --bg: #0b1220; --fg: #e5e7eb; --card: #111827; --border: #1f2937; --muted: #9ca3af; }
+  :root {
+    color-scheme: dark;
+    --bg: #0a0e14;
+    --bg-soft: #0d121a;
+    --surface: #131a24;
+    --surface-hover: #182130;
+    --border: #232c3a;
+    --border-soft: #1a2230;
+    --text: #e9edf2;
+    --text-muted: #97a3b8;
+    --text-faint: #5e6b81;
+    --accent: #35d0a8;
+    --accent-strong: #24c197;
+    --accent-soft: rgba(53, 208, 168, 0.12);
+    --gold: #d9b26a;
+    --gold-strong: #c49a52;
+    --gold-soft: rgba(217, 178, 106, 0.12);
+    --danger: #e2836f;
+    --danger-soft: rgba(226, 131, 111, 0.12);
+    --radius-lg: 18px;
+    --radius-md: 12px;
+    --radius-sm: 8px;
+    --shadow-lg: 0 30px 80px -30px rgba(0, 0, 0, 0.65);
+    --shadow-sm: 0 10px 30px -18px rgba(0, 0, 0, 0.55);
+    --sidebar-w: 248px;
+    --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  }
   * { box-sizing: border-box; }
-  body { margin: 0; font-family: -apple-system, Segoe UI, Roboto, sans-serif; background: var(--bg); color: var(--fg); }
-  header { display: flex; align-items: center; gap: 1.5rem; padding: 0.75rem 1.5rem; border-bottom: 1px solid var(--border); }
-  header a { color: var(--fg); text-decoration: none; opacity: 0.8; }
-  header a:hover { opacity: 1; }
-  header .brand { font-weight: 700; margin-right: 1rem; }
-  main { padding: 1.5rem; max-width: 1100px; margin: 0 auto; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    font-family: var(--font-sans);
+    background: var(--bg);
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; }
+  .icon { display: inline-block; vertical-align: -3px; flex-shrink: 0; }
+
+  .shell { display: flex; min-height: 100vh; }
+
+  .sidebar {
+    width: var(--sidebar-w);
+    flex-shrink: 0;
+    background: var(--bg-soft);
+    border-right: 1px solid var(--border-soft);
+    display: flex;
+    flex-direction: column;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 1.4rem 1.3rem 1.1rem;
+  }
+  .brand .dot {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 12px 2px var(--accent-soft);
+    flex-shrink: 0;
+  }
+  .brand .name { font-weight: 700; font-size: 0.98rem; letter-spacing: -0.01em; }
+  .brand .sub { display: block; color: var(--text-faint); font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.09em; margin-top: 0.1rem; }
+
+  nav.nav { flex: 1; padding: 0.5rem 0.7rem; overflow-y: auto; }
+  nav.nav a {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    padding: 0.55rem 0.75rem;
+    margin-bottom: 0.15rem;
+    border-radius: var(--radius-sm);
+    text-decoration: none;
+    color: var(--text-muted);
+    font-size: 0.86rem;
+    font-weight: 500;
+    border-left: 2px solid transparent;
+    transition: background 0.12s ease, color 0.12s ease;
+  }
+  nav.nav a:hover { background: var(--surface-hover); color: var(--text); }
+  nav.nav a.active {
+    background: var(--accent-soft);
+    color: var(--accent);
+    border-left-color: var(--accent);
+  }
+  nav.nav a.active .icon { color: var(--accent); }
+
+  .sidebar-foot {
+    padding: 0.9rem 1.1rem 1.1rem;
+    border-top: 1px solid var(--border-soft);
+  }
+  .sidebar-foot .who {
+    display: flex; align-items: center; gap: 0.55rem;
+    color: var(--text-muted); font-size: 0.78rem;
+    margin-bottom: 0.6rem; word-break: break-all;
+  }
+  .sidebar-foot .avatar {
+    width: 24px; height: 24px; border-radius: 50%;
+    background: var(--gold-soft); color: var(--gold);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.72rem; font-weight: 700; flex-shrink: 0;
+  }
+  .sidebar-foot form { margin: 0; }
+  .sidebar-foot button.ghost-full {
+    width: 100%; display: flex; align-items: center; gap: 0.5rem; justify-content: center;
+  }
+
+  main.content { flex: 1; min-width: 0; padding: 2.2rem 2.6rem 3rem; max-width: 1180px; }
+
+  h1.page-title { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.015em; margin: 0 0 0.3rem; }
+  p.page-sub { color: var(--text-muted); font-size: 0.9rem; margin: 0 0 1.6rem; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 1.25rem 1.4rem;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.75rem; }
+  .kpi { display: flex; flex-direction: column; gap: 0.7rem; }
+  .kpi .badge {
+    width: 36px; height: 36px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--accent-soft); color: var(--accent);
+  }
+  .kpi.gold .badge { background: var(--gold-soft); color: var(--gold); }
+  .kpi .value { font-size: 1.65rem; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+  .kpi.gold .value { color: var(--gold); }
+  .kpi .label { color: var(--text-faint); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; }
+
   table { width: 100%; border-collapse: collapse; }
-  th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
-  th { color: var(--muted); font-weight: 600; }
-  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 1rem 1.25rem; }
-  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
-  .kpi .value { font-size: 1.6rem; font-weight: 700; }
-  .kpi .label { color: var(--muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; }
+  th, td { text-align: left; padding: 0.65rem 0.8rem; border-bottom: 1px solid var(--border-soft); font-size: 0.87rem; }
+  th { color: var(--text-faint); font-weight: 600; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; }
+  tbody tr { transition: background 0.1s ease; }
+  tbody tr:hover { background: var(--surface-hover); }
+  tbody tr:last-child td { border-bottom: none; }
+  td.mono, .mono { font-family: var(--font-mono); font-size: 0.82rem; }
+  th:last-child, td:last-child { text-align: right; }
+
   form.inline { display: inline; }
-  button { background: var(--accent); color: white; border: none; border-radius: 6px; padding: 0.4rem 0.8rem; cursor: pointer; font-size: 0.85rem; }
-  button.secondary { background: transparent; border: 1px solid var(--border); color: var(--fg); }
-  .empty { color: var(--muted); padding: 2rem 0; text-align: center; }
-  .pill { display: inline-block; padding: 0.1rem 0.5rem; border-radius: 999px; font-size: 0.75rem; background: var(--border); }
+  button, input[type="text"] {
+    font-family: var(--font-sans);
+    font-size: 0.83rem;
+  }
+  button {
+    background: var(--accent);
+    color: #06110d;
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: 0.5rem 0.95rem;
+    cursor: pointer;
+    font-weight: 600;
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    transition: background 0.12s ease, transform 0.05s ease;
+  }
+  button:hover { background: var(--accent-strong); }
+  button:active { transform: translateY(1px); }
+  button.secondary { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  button.secondary:hover { background: var(--surface-hover); border-color: var(--text-faint); }
+  button.danger { background: var(--danger); color: #200b06; }
+  button.danger:hover { filter: brightness(1.08); }
+  input[type="text"] {
+    background: var(--bg-soft); border: 1px solid var(--border); color: var(--text);
+    border-radius: var(--radius-sm); padding: 0.45rem 0.6rem;
+  }
+  input[type="text"]:focus { outline: none; border-color: var(--accent); }
+
+  .empty { color: var(--text-faint); padding: 3rem 0; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 0.7rem; font-size: 0.9rem; }
+  .empty .icon { color: var(--border); }
+
+  .pill {
+    display: inline-flex; align-items: center; gap: 0.3rem;
+    padding: 0.18rem 0.6rem; border-radius: 999px;
+    font-size: 0.72rem; font-weight: 600; letter-spacing: 0.01em;
+    background: var(--border-soft); color: var(--text-muted);
+  }
+  .pill.good { background: var(--accent-soft); color: var(--accent); }
+  .pill.warn { background: var(--gold-soft); color: var(--gold); }
+  .pill.bad { background: var(--danger-soft); color: var(--danger); }
+
+  .link { color: var(--accent); text-decoration: none; font-weight: 500; }
+  .link:hover { text-decoration: underline; }
 </style>
 {% block head %}{% endblock %}
 </head>
 <body>
+<div class="shell">
 {% if session %}
-<header>
-  <span class="brand">RevenueFlow</span>
-  <a href="/portal/">Home</a>
-  <a href="/portal/conversations">Conversas</a>
-  <a href="/portal/transactions">Transações</a>
-  <a href="/portal/customers">Clientes</a>
-  <a href="/portal/funnel">Funil</a>
-  <a href="/portal/approvals">Aprovações</a>
-  <a href="/portal/handoffs">Handoffs</a>
-  <a href="/portal/live">Agentes ao vivo</a>
-  <span style="margin-left: auto; color: var(--muted); font-size: 0.85rem;">{{ session.email }}</span>
-  <form class="inline" method="post" action="/portal/logout"><button class="secondary" type="submit">Sair</button></form>
-</header>
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="dot" aria-hidden="true"></span>
+      <span>
+        <span class="name">RevenueFlow</span>
+        <span class="sub">Portal</span>
+      </span>
+    </div>
+    <nav class="nav">
+      <a href="/portal/" class="{{ 'active' if request.url.path == '/portal/' else '' }}">{{ icons.home() }}Visão geral</a>
+      <a href="/portal/conversations" class="{{ 'active' if request.url.path.startswith('/portal/conversations') else '' }}">{{ icons.chat() }}Conversas</a>
+      <a href="/portal/transactions" class="{{ 'active' if request.url.path.startswith('/portal/transactions') else '' }}">{{ icons.card() }}Transações</a>
+      <a href="/portal/customers" class="{{ 'active' if request.url.path.startswith('/portal/customers') else '' }}">{{ icons.users() }}Clientes</a>
+      <a href="/portal/funnel" class="{{ 'active' if request.url.path.startswith('/portal/funnel') else '' }}">{{ icons.funnel() }}Funil</a>
+      <a href="/portal/approvals" class="{{ 'active' if request.url.path.startswith('/portal/approvals') else '' }}">{{ icons.shield_check() }}Aprovações</a>
+      <a href="/portal/handoffs" class="{{ 'active' if request.url.path.startswith('/portal/handoffs') else '' }}">{{ icons.life_buoy() }}Handoffs</a>
+      <a href="/portal/live" class="{{ 'active' if request.url.path.startswith('/portal/live') else '' }}">{{ icons.activity() }}Agentes ao vivo</a>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="who">
+        <span class="avatar">{{ session.email[0]|upper }}</span>
+        <span>{{ session.email }}</span>
+      </div>
+      <form method="post" action="/portal/logout">
+        <button class="secondary ghost-full" type="submit">{{ icons.logout(16) }}Sair</button>
+      </form>
+    </div>
+  </aside>
 {% endif %}
-<main>
-{% block content %}{% endblock %}
-</main>
+  <main class="content"{{ ' style="max-width:none;"'|safe if not session else '' }}>
+    {% block content %}{% endblock %}
+  </main>
+</div>
 {% block autorefresh %}{% endblock %}
 </body>
 </html>

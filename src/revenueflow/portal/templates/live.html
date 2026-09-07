@@ -1,50 +1,99 @@
 {% extends "base.html" %}
+{% import "_icons.html" as icons %}
 {% block title %} — Agentes ao vivo{% endblock %}
 {% block head %}
 <style>
-  .graph { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; }
-  .node { border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem 0.9rem; background: var(--card); font-size: 0.85rem; transition: all 0.15s ease; }
-  .node.active { border-color: #22c55e; box-shadow: 0 0 0 3px rgba(34,197,94,0.25); background: #052e16; }
-  .arrow { color: var(--muted); }
-  #log { margin-top: 1.5rem; font-family: monospace; font-size: 0.8rem; color: var(--muted); max-height: 240px; overflow-y: auto; }
+  .flow { display: flex; flex-wrap: wrap; align-items: center; gap: 0; }
+  .node {
+    display: flex; flex-direction: column; align-items: center; gap: 0.55rem;
+    border: 1px solid var(--border); border-radius: var(--radius-md);
+    padding: 0.9rem 1.1rem; background: var(--bg-soft);
+    min-width: 108px; text-align: center;
+    transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+  }
+  .node .badge {
+    width: 38px; height: 38px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--surface-hover); color: var(--text-muted);
+    transition: background 0.2s ease, color 0.2s ease;
+  }
+  .node .label { font-size: 0.78rem; font-weight: 600; color: var(--text-muted); font-family: var(--font-mono); }
+  .node.active {
+    border-color: var(--live, #35e0a0);
+    background: rgba(53, 224, 160, 0.08);
+    box-shadow: 0 0 0 3px rgba(53, 224, 160, 0.16), 0 0 24px -4px rgba(53, 224, 160, 0.5);
+    transform: translateY(-2px);
+  }
+  .node.active .badge { background: rgba(53, 224, 160, 0.18); color: var(--live, #35e0a0); }
+  .node.active .label { color: var(--live, #35e0a0); }
+  .arrow { color: var(--text-faint); padding: 0 0.3rem; flex-shrink: 0; }
+  .branch-row { margin-top: 1.1rem; padding-top: 1.1rem; border-top: 1px dashed var(--border-soft); }
+  .branch-row .flow { gap: 0.9rem; }
+
+  .live-dot {
+    width: 8px; height: 8px; border-radius: 50%; display: inline-block;
+    background: var(--live, #35e0a0); box-shadow: 0 0 8px 1px rgba(53,224,160,0.7);
+    animation: pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+  #log {
+    margin-top: 1.5rem; font-family: var(--font-mono); font-size: 0.78rem; color: var(--text-muted);
+    max-height: 260px; overflow-y: auto; padding: 1rem 1.2rem; line-height: 1.7;
+  }
+  #log .row { border-bottom: 1px solid var(--border-soft); padding-bottom: 0.35rem; margin-bottom: 0.35rem; }
+  #log .row:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+  #log .t { color: var(--text-faint); }
 </style>
 {% endblock %}
 {% block content %}
-<h1 style="font-size:1.3rem;">Agentes ao vivo</h1>
-<p style="color:var(--muted); font-size:0.85rem;">O nó acende quando um turno real está sendo processado por aquele agente.</p>
+<h1 class="page-title" style="display:flex; align-items:center; gap:0.6rem;">
+  <span class="live-dot" aria-hidden="true"></span>
+  Agentes ao vivo
+</h1>
+<p class="page-sub">O nó acende quando um turno real está sendo processado por aquele agente (LangGraph, via Postgres LISTEN/NOTIFY).</p>
+
 <div class="card">
-  <div class="graph">
-    <div class="node" data-agent="classify_intent">classify_intent</div>
+  <div class="flow">
+    <div class="node" data-agent="classify_intent"><span class="badge">{{ icons.search(19) }}</span><span class="label">classify_intent</span></div>
     <span class="arrow">→</span>
-    <div class="node" data-agent="supervisor">supervisor</div>
+    <div class="node" data-agent="supervisor"><span class="badge">{{ icons.compass(19) }}</span><span class="label">supervisor</span></div>
     <span class="arrow">→</span>
-    <div class="node" data-agent="recommendation">recommendation</div>
+    <div class="node" data-agent="recommendation"><span class="badge">{{ icons.sparkles(19) }}</span><span class="label">recommendation</span></div>
     <span class="arrow">→</span>
-    <div class="node" data-agent="negotiation">negotiation</div>
+    <div class="node" data-agent="negotiation"><span class="badge">{{ icons.scale(19) }}</span><span class="label">negotiation</span></div>
     <span class="arrow">→</span>
-    <div class="node" data-agent="await_approval">await_approval</div>
+    <div class="node" data-agent="await_approval"><span class="badge">{{ icons.hourglass(19) }}</span><span class="label">await_approval</span></div>
     <span class="arrow">→</span>
-    <div class="node" data-agent="apply_decision">apply_decision</div>
+    <div class="node" data-agent="apply_decision"><span class="badge">{{ icons.check_circle(19) }}</span><span class="label">apply_decision</span></div>
     <span class="arrow">→</span>
-    <div class="node" data-agent="checkout">checkout</div>
+    <div class="node" data-agent="checkout"><span class="badge">{{ icons.cart(19) }}</span><span class="label">checkout</span></div>
   </div>
-  <div class="graph" style="margin-top:0.75rem;">
-    <div class="node" data-agent="respond">respond</div>
-    <div class="node" data-agent="handoff">handoff</div>
+  <div class="branch-row flow">
+    <div class="node" data-agent="respond"><span class="badge">{{ icons.reply(19) }}</span><span class="label">respond</span></div>
+    <div class="node" data-agent="handoff"><span class="badge">{{ icons.life_buoy(19) }}</span><span class="label">handoff</span></div>
   </div>
 </div>
-<pre id="log"></pre>
+
+<div class="card" id="log"><span style="color:var(--text-faint);">aguardando eventos…</span></div>
+
 <script>
   const nodes = {};
   document.querySelectorAll(".node").forEach((el) => { nodes[el.dataset.agent] = el; });
   const log = document.getElementById("log");
+  let first = true;
   const source = new EventSource("/portal/live/stream");
   source.onmessage = (event) => {
     let payload;
     try { payload = JSON.parse(event.data); } catch (e) { return; }
     const node = nodes[payload.agent];
     if (node) node.classList.toggle("active", payload.status === "started");
-    log.textContent = `${new Date().toLocaleTimeString()} ${payload.agent} ${payload.status}\n` + log.textContent;
+    if (first) { log.innerHTML = ""; first = false; }
+    const row = document.createElement("div");
+    row.className = "row";
+    row.innerHTML = `<span class="t">${new Date().toLocaleTimeString()}</span> · <strong>${payload.agent}</strong> · ${payload.status}`;
+    log.prepend(row);
+    while (log.children.length > 40) log.removeChild(log.lastChild);
   };
 </script>
 {% endblock %}
