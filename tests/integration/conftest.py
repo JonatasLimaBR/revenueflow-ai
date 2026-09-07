@@ -51,6 +51,34 @@ def _text_payload(text: str) -> dict[str, object]:
     }
 
 
+def _status_payload() -> dict[str, object]:
+    return {
+        "object": "whatsapp_business_account",
+        "entry": [
+            {
+                "id": "entry-1",
+                "changes": [
+                    {
+                        "field": "messages",
+                        "value": {
+                            "messaging_product": "whatsapp",
+                            "metadata": {"phone_number_id": "pnid-1"},
+                            "statuses": [
+                                {
+                                    "id": "wamid.TEST1",
+                                    "status": "delivered",
+                                    "timestamp": "1724930000",
+                                    "recipient_id": "5511999999999",
+                                }
+                            ],
+                        },
+                    }
+                ],
+            }
+        ],
+    }
+
+
 def _sign(body: bytes) -> str:
     digest = hmac.new(_APP_SECRET.encode(), body, hashlib.sha256).hexdigest()
     return f"sha256={digest}"
@@ -107,6 +135,17 @@ def signed_webhook() -> SignedWebhook:
 
     def _make(text: str = "quero uma bomba d'agua 1cv") -> tuple[bytes, str]:
         body = json.dumps(_text_payload(text)).encode()
+        return body, _sign(body)
+
+    return _make
+
+
+@pytest.fixture
+def signed_status_webhook() -> Callable[[], tuple[bytes, str]]:
+    """Return a factory for a delivery-status callback (no ``messages`` key)."""
+
+    def _make() -> tuple[bytes, str]:
+        body = json.dumps(_status_payload()).encode()
         return body, _sign(body)
 
     return _make
