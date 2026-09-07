@@ -1,24 +1,44 @@
 {% extends "base.html" %}
+{% import "_icons.html" as icons %}
 {% block title %} — Home{% endblock %}
 {% block content %}
-<h1 style="font-size:1.3rem;">Visão geral</h1>
+<h1 class="page-title">Visão geral</h1>
+<p class="page-sub">Resumo comercial e de custo de IA em tempo real.</p>
 <div class="kpis">
-  <div class="card kpi"><div class="value">${{ "%.2f"|format(total_revenue) }}</div><div class="label">Receita</div></div>
-  <div class="card kpi"><div class="value">${{ "%.4f"|format(total_ai_cost) }}</div><div class="label">Custo de IA</div></div>
-  <div class="card kpi"><div class="value">{{ conversation_count }}</div><div class="label">Conversas</div></div>
-  <div class="card kpi"><div class="value">{{ "%.1f"|format(handoff_rate * 100) }}%</div><div class="label">Taxa de handoff</div></div>
+  <div class="card kpi gold">
+    <span class="badge">{{ icons.coin(20) }}</span>
+    <span class="value">${{ "%.2f"|format(total_revenue) }}</span>
+    <span class="label">Receita</span>
+  </div>
+  <div class="card kpi">
+    <span class="badge">{{ icons.cpu(20) }}</span>
+    <span class="value">${{ "%.4f"|format(total_ai_cost) }}</span>
+    <span class="label">Custo de IA</span>
+  </div>
+  <div class="card kpi">
+    <span class="badge">{{ icons.chat(20) }}</span>
+    <span class="value">{{ conversation_count }}</span>
+    <span class="label">Conversas</span>
+  </div>
+  <div class="card kpi">
+    <span class="badge">{{ icons.life_buoy(20) }}</span>
+    <span class="value">{{ "%.1f"|format(handoff_rate * 100) }}%</span>
+    <span class="label">Taxa de handoff</span>
+  </div>
 </div>
 <div class="card">
-  <h2 style="font-size:1rem; margin-top:0;">Custo por outcome</h2>
+  <h2 style="font-size:0.95rem; margin:0 0 1rem; font-weight:600;">Custo por outcome</h2>
   {% if cost_rows %}
   <table>
-    <tr><th>Outcome</th><th>Turnos</th><th>Custo total</th></tr>
+    <thead><tr><th>Outcome</th><th>Turnos</th><th style="text-align:right;">Custo total</th></tr></thead>
+    <tbody>
     {% for row in cost_rows %}
-    <tr><td>{{ row.outcome }}</td><td>{{ row.turns }}</td><td>${{ "%.4f"|format(row.cost_usd) }}</td></tr>
+    <tr><td><span class="pill">{{ row.outcome }}</span></td><td class="mono">{{ row.turns }}</td><td class="mono" style="text-align:right;">${{ "%.4f"|format(row.cost_usd) }}</td></tr>
     {% endfor %}
+    </tbody>
   </table>
   {% else %}
-  <p class="empty">Nenhuma conversa ainda.</p>
+  <div class="empty">{{ icons.inbox(28) }}Nenhuma conversa ainda.</div>
   {% endif %}
 </div>
 {% endblock %}

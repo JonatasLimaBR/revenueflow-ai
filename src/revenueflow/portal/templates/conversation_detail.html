@@ -1,23 +1,26 @@
 {% extends "base.html" %}
+{% import "_icons.html" as icons %}
 {% block title %} — Conversa{% endblock %}
 {% block content %}
-<h1 style="font-size:1.3rem;">Conversa {{ conversation_id }}</h1>
-<p style="color:var(--muted);">{{ phone or "telefone indisponível" }}
-  · <a href="/portal/conversations/{{ conversation_id }}/audit.json">exportar auditoria (JSON)</a></p>
+<h1 class="page-title">Conversa <span class="mono" style="font-size:1.1rem; color:var(--text-muted);">{{ conversation_id }}</span></h1>
+<p class="page-sub">
+  {{ phone or "telefone indisponível" }}
+  · <a class="link" href="/portal/conversations/{{ conversation_id }}/audit.json">{{ icons.download(14) }} exportar auditoria (JSON)</a>
+</p>
 <div class="card">
 {% if turns %}
 {% for turn in turns %}
-<details style="margin-bottom:0.75rem; border-bottom:1px solid var(--border); padding-bottom:0.75rem;">
-  <summary>
+<details style="margin-bottom:0.75rem; border-bottom:1px solid var(--border-soft); padding-bottom:0.75rem;">
+  <summary style="cursor:pointer;">
     <strong>{{ turn.agent or "—" }}</strong>
-    <span class="pill">{{ turn.outcome }}</span>
-    · ${{ "%.4f"|format(turn.cost_usd|float) }} · {{ turn.latency_ms }}ms
+    <span class="pill {{ icons.status_class(turn.outcome) }}">{{ turn.outcome }}</span>
+    · <span class="mono" style="color:var(--text-muted);">${{ "%.4f"|format(turn.cost_usd|float) }} · {{ turn.latency_ms }}ms</span>
   </summary>
-  <pre style="white-space:pre-wrap; font-size:0.8rem; color:var(--muted);">{{ turn.events | tojson(indent=2) }}</pre>
+  <pre style="white-space:pre-wrap; font-size:0.78rem; color:var(--text-muted); background:var(--bg-soft); border-radius:var(--radius-sm); padding:0.8rem; margin-top:0.6rem;">{{ turn.events | tojson(indent=2) }}</pre>
 </details>
 {% endfor %}
 {% else %}
-<p class="empty">Nenhum turno auditado ainda pra esta conversa.</p>
+<div class="empty">{{ icons.inbox(28) }}Nenhum turno auditado ainda pra esta conversa.</div>
 {% endif %}
 </div>
 {% endblock %}

@@ -2,12 +2,21 @@
 {% block title %} — Login{% endblock %}
 {% block head %}
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  .login-wrap { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 2rem; }
+  .login-card { text-align: center; max-width: 380px; width: 100%; padding: 2.4rem 2.2rem; }
+  .login-card .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 14px 3px var(--accent-soft); display: inline-block; margin-bottom: 1rem; }
+  .login-card h1 { font-size: 1.3rem; font-weight: 700; letter-spacing: -0.015em; margin: 0 0 0.35rem; }
+  .login-card p.sub { color: var(--text-muted); font-size: 0.88rem; margin: 0 0 1.6rem; }
+  .g_id_signin { display: flex; justify-content: center; }
+</style>
 {% endblock %}
 {% block content %}
-<div style="display:flex; align-items:center; justify-content:center; min-height:70vh;">
-  <div class="card" style="text-align:center; max-width:360px;">
-    <h1 style="font-size:1.2rem;">RevenueFlow Portal</h1>
-    <p style="color:var(--muted); font-size:0.9rem;">Acesso restrito à equipe.</p>
+<div class="login-wrap">
+  <div class="card login-card">
+    <span class="dot"></span>
+    <h1>RevenueFlow Portal</h1>
+    <p class="sub">Acesso restrito à equipe.</p>
     {% if google_client_id %}
     <div id="g_id_onload"
          data-client_id="{{ google_client_id }}"

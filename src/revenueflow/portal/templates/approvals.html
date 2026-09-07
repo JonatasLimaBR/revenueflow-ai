@@ -1,29 +1,39 @@
 {% extends "base.html" %}
+{% import "_icons.html" as icons %}
 {% block title %} — Aprovações{% endblock %}
 {% block content %}
-<h1 style="font-size:1.3rem;">Aprovações pendentes</h1>
+<h1 class="page-title">Aprovações pendentes</h1>
+<p class="page-sub">Descontos fora da alçada do Policy Engine, aguardando decisão humana.</p>
 {% if approvals %}
 {% for a in approvals %}
-<div class="card" style="margin-bottom:1rem;">
-  <p><strong>{{ a.approval_id }}</strong> · conversa {{ a.conversation_id }} · desconto pedido {{ a.requested_discount }} · valor ${{ a.amount }}</p>
-  <p style="color:var(--muted); font-size:0.85rem;">{{ a.reason }} · expira em {{ a.expires_at or "—" }}</p>
-  <form class="inline" method="post" action="/portal/approvals/{{ a.approval_id }}">
-    <input type="hidden" name="decision" value="approve">
-    <button type="submit">Aprovar</button>
-  </form>
-  <form class="inline" method="post" action="/portal/approvals/{{ a.approval_id }}">
-    <input type="hidden" name="decision" value="reject">
-    <button class="secondary" type="submit">Rejeitar</button>
-  </form>
-  <form class="inline" method="post" action="/portal/approvals/{{ a.approval_id }}">
-    <input type="hidden" name="decision" value="approve_with_override">
-    <input type="text" name="discount_pct" placeholder="% desconto" style="width:90px;">
-    <button class="secondary" type="submit">Aprovar com override</button>
-  </form>
+<div class="card" style="margin-bottom:1rem; display:flex; gap:1rem; align-items:flex-start;">
+  <span class="kpi gold" style="flex-shrink:0;"><span class="badge">{{ icons.hourglass(18) }}</span></span>
+  <div style="flex:1; min-width:0;">
+    <p style="margin:0 0 0.35rem;">
+      <span class="mono" style="font-weight:600;">{{ a.approval_id }}</span>
+      · conversa <span class="mono">{{ a.conversation_id }}</span>
+      · desconto pedido <span class="pill warn">{{ a.requested_discount }}</span>
+      · valor <strong>${{ a.amount }}</strong>
+    </p>
+    <p style="color:var(--text-muted); font-size:0.85rem; margin:0 0 0.9rem;">{{ a.reason }} · expira em {{ a.expires_at or "—" }}</p>
+    <form class="inline" method="post" action="/portal/approvals/{{ a.approval_id }}">
+      <input type="hidden" name="decision" value="approve">
+      <button type="submit">{{ icons.check_circle(15) }}Aprovar</button>
+    </form>
+    <form class="inline" method="post" action="/portal/approvals/{{ a.approval_id }}">
+      <input type="hidden" name="decision" value="reject">
+      <button class="secondary" type="submit">Rejeitar</button>
+    </form>
+    <form class="inline" method="post" action="/portal/approvals/{{ a.approval_id }}">
+      <input type="hidden" name="decision" value="approve_with_override">
+      <input type="text" name="discount_pct" placeholder="% desconto" style="width:100px;">
+      <button class="secondary" type="submit">Aprovar com override</button>
+    </form>
+  </div>
 </div>
 {% endfor %}
 {% else %}
-<div class="card"><p class="empty">Nenhuma aprovação pendente.</p></div>
+<div class="card"><div class="empty">{{ icons.shield_check(28) }}Nenhuma aprovação pendente.</div></div>
 {% endif %}
 {% endblock %}
 {% block autorefresh %}<script>setInterval(() => location.reload(), 30000);</script>{% endblock %}

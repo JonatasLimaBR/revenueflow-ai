@@ -1,24 +1,28 @@
 {% extends "base.html" %}
+{% import "_icons.html" as icons %}
 {% block title %} — Clientes{% endblock %}
 {% block content %}
-<h1 style="font-size:1.3rem;">Clientes (360°)</h1>
+<h1 class="page-title">Clientes (360°)</h1>
+<p class="page-sub">Visão comercial agregada dos últimos 365 dias.</p>
 <div class="card">
 {% if customers %}
 <table>
-  <tr><th>Cliente</th><th>Pedidos (12m)</th><th>Receita (12m)</th><th>Última compra</th><th>Produto preferido</th><th>Quotes abertas</th></tr>
+  <thead><tr><th>Cliente</th><th>Pedidos (12m)</th><th style="text-align:right;">Receita (12m)</th><th>Última compra</th><th>Produto preferido</th><th>Quotes abertas</th></tr></thead>
+  <tbody>
   {% for c in customers %}
   <tr>
-    <td>{{ c.customer_id }}</td>
+    <td class="mono">{{ c.customer_id }}</td>
     <td>{{ c.orders_12m }}</td>
-    <td>${{ "%.2f"|format(c.revenue_12m|float) }}</td>
-    <td>{{ c.last_purchase or "—" }}</td>
+    <td class="mono" style="text-align:right; color:var(--gold);">${{ "%.2f"|format(c.revenue_12m|float) }}</td>
+    <td style="color:var(--text-muted);">{{ c.last_purchase or "—" }}</td>
     <td>{{ c.preferred_product or "—" }}</td>
-    <td>{{ c.open_quotes }}</td>
+    <td>{% if c.open_quotes %}<span class="pill warn">{{ c.open_quotes }}</span>{% else %}0{% endif %}</td>
   </tr>
   {% endfor %}
+  </tbody>
 </table>
 {% else %}
-<p class="empty">Nenhum cliente ainda.</p>
+<div class="empty">{{ icons.users(28) }}Nenhum cliente ainda.</div>
 {% endif %}
 </div>
 {% endblock %}
