@@ -1,10 +1,17 @@
 """Event publisher port and its implementations.
 
-The default publisher is ``InMemoryPublisher`` and runs on the standard library
-alone. ``PubSubPublisher`` imports ``google.cloud.pubsub_v1`` lazily inside
-``__init__`` so importing this module never requires the optional ``events``
-extra. Real Pub/Sub wiring lands in a later increment; ``_default_publisher``
-keeps returning the in-memory implementation for now.
+``_default_publisher`` selects ``InMemoryPublisher`` for local/test settings
+(default ``pubsub_project_id`` and no emulator host) and ``PubSubPublisher``
+otherwise (real GCP project id or an emulator configured). ``PubSubPublisher``
+imports ``google.cloud.pubsub_v1`` lazily inside ``__init__`` so importing
+this module never requires the optional ``events`` extra unless the selected
+backend actually needs it.
+
+Found live (2026-09-07): both branches used to return ``InMemoryPublisher``,
+so every webhook-triggered event was ever only appended to an in-process list
+and discarded at the end of the request — the real Pub/Sub topic the
+subscriber pulls from never received anything, in any environment, including
+production. No inbound WhatsApp message had ever reached the graph.
 """
 
 from __future__ import annotations
@@ -70,7 +77,7 @@ _publisher: ContextVar[EventPublisher | None] = ContextVar("revenueflow_publishe
 def _default_publisher() -> EventPublisher:
     settings = get_settings()
     if settings.pubsub_emulator_host or settings.pubsub_project_id != "revenueflow-local":
-        return InMemoryPublisher()
+        return PubSubPublisher()
     return InMemoryPublisher()
 
 
