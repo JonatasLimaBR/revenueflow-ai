@@ -58,7 +58,10 @@ async def run_subscriber() -> None:
                 "pubsub message dispatched: message_id=%s publish_time=%s delivery_delay_s=%s",
                 getattr(message, "message_id", None),
                 publish_time,
-                (received_at - publish_time.timestamp()) if publish_time else None,
+                # time.time(), not received_at (time.monotonic() has no
+                # relation to wall-clock/epoch time — mixing the two here
+                # produced a nonsensical multi-billion-second delta live).
+                (time.time() - publish_time.timestamp()) if publish_time else None,
             )
             envelope = from_json(message.data)
             handler = _ROUTES.get(envelope.event_type)

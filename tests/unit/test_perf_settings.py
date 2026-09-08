@@ -14,7 +14,7 @@ def test_defaults() -> None:
     s = get_settings()
     assert s.llm_call_timeout_s == 6.0
     assert s.db_statement_timeout_ms == 3000
-    assert s.turn_budget_s == 15.0
+    assert s.turn_budget_s == 25.0
 
 
 def test_env_override(monkeypatch: pytest.MonkeyPatch) -> None:

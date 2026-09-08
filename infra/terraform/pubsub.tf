@@ -16,7 +16,12 @@ resource "google_pubsub_subscription" "messages" {
   name  = "revenueflow.messages"
   topic = google_pubsub_topic.messages.id
 
-  ack_deadline_seconds = 60
+  # >= turn_budget_s (25s) with real margin for the surrounding non-graph
+  # work (claim, session, resolve, record_turn, audit) — found live: turns
+  # that legitimately ran past 60s got redelivered mid-flight, piling up
+  # concurrent duplicate processing of the same message instead of just
+  # running long once.
+  ack_deadline_seconds = 120
 
   retry_policy {
     minimum_backoff = "5s"

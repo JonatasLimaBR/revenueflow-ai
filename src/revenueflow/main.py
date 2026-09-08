@@ -59,7 +59,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         open=False,
         min_size=2,
         max_size=10,
-        kwargs={"autocommit": True, "prepare_threshold": 0, "row_factory": dict_row},
+        kwargs={
+            "autocommit": True,
+            "prepare_threshold": 0,
+            "row_factory": dict_row,
+            # Already flagged as a gap in ADR-057 itself ("pool do
+            # checkpointer não tem statement_timeout") — the app's own pool
+            # had this from the start; the checkpointer's bare connection
+            # never did, so a stuck checkpoint query had no backstop.
+            "options": f"-c statement_timeout={settings.db_statement_timeout_ms}",
+        },
     )
     await checkpoint_pool.open()
     try:

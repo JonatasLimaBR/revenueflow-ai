@@ -112,6 +112,27 @@ nova. `outcome="timeout"` cai na linha `audit.turn` sem mudança de schema. Os �
 - Follow-ups: `turn_budget_s` por-fase (C2), pool/timeout maior para o Job de `scan` (C1),
   `statement_timeout` no checkpointer (A4), métrica `revenueflow_turn_timeouts` dedicada (C3).
 
+## Correção pós-merge (2026-09-08)
+O primeiro turno real de produção (depois de destravar o `EventPublisher`, ver ADR desta data em
+CLAUDE.md) revelou dois gaps que o `turn_budget_s=15` original não cobria:
+1. **O pool do checkpointer nunca foi criado** — `AsyncPostgresSaver.from_conn_string` segurava
+   uma única conexão bare pela vida toda do processo, atrás do próprio `asyncio.Lock()` da lib,
+   compartilhada por todo turno concorrente. Já era o follow-up "A4" listado acima
+   ("`statement_timeout` no checkpointer") mas nunca foi de fato feito — corrigido junto: o
+   checkpointer agora recebe um `AsyncConnectionPool` de verdade (a lib aceita isso nativamente,
+   verificado via `isinstance` no seu próprio `__init__`), com `statement_timeout` igual ao do
+   pool da app.
+2. **15s não era folga suficiente** — mesmo depois desse fix e de outros três (cliente Vertex
+   reconstruído a cada chamada, pool da app fixo em 4 conexões), um turno real sem nenhum bug
+   ainda levou ~30s (2 chamadas Gemini reais sequenciais + overhead de DB), estourando
+   `turn_budget_s` e caindo no `_SLOW_REPLY` em vez da resposta real. A rejeição original de "20s"
+   (ver Alternativas acima) foi uma decisão sem dado real de produção — o primeiro turno de
+   verdade mostrou que nem 20s bastava. `turn_budget_s` subiu pra **25s**; `ack_deadline_seconds`
+   da subscription subiu de 60s pra **120s** (`infra/terraform/pubsub.tf`) — um turno que
+   legitimamente passava de 60s estava sendo redeliverado pelo Pub/Sub **enquanto ainda rodava**,
+   causando processamento concorrente duplicado da mesma mensagem e piorando a lentidão que
+   causou o redelivery em primeiro lugar.
+
 ## Regra de revisão
 Mudanças nesta decisão — em especial remover o teto do turno, transformar o timeout num nack que
 reprocessa meio turno, pôr o LLM na resposta de `outcome="timeout"`, ou apertar `turn_budget_s`
