@@ -60,7 +60,10 @@ async def negotiation_node(state: TurnState) -> dict[str, Any]:
             }
 
         ask = extract_price_ask(state["customer_text"])
-        qty = ask.quantity or 1
+        # Same rule as the discount below: a closing follow-up ("pode
+        # faturar") never repeats the quantity a prior turn already
+        # established -- fall back to it instead of silently re-quoting 1 un.
+        qty = ask.quantity or state.get("requested_quantity") or 1
         customer_ref = state.get("customer_id")
         quote = await tools_pricing.get_price(customer_ref, product_id, qty)
 
@@ -79,7 +82,19 @@ async def negotiation_node(state: TurnState) -> dict[str, Any]:
                 _ONE - Decimal(str(ask.target_price)) / Decimal(quote["customer_price"]),
             )
         else:
-            requested = None
+            # A plain follow-up (eg. a quantity change, "preciso de 20
+            # unidades") never restates the discount already negotiated this
+            # conversation. Re-propose the SAME rate for the new quantity
+            # instead of silently dropping back to list price -- still
+            # through propose_allowed_discount below, so a quantity jump
+            # that pushes the amount out of policy re-opens approval rather
+            # than auto-granting a bigger discount than was ever approved.
+            established = state.get("checkout_discount")
+            requested = (
+                Decimal(established)
+                if established is not None and Decimal(established) > 0
+                else None
+            )
 
         if requested is None:
             price = Decimal(quote["customer_price"]).quantize(_CENT)

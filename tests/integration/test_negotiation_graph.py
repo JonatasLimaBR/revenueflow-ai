@@ -1,3 +1,4 @@
+from decimal import Decimal
 from uuid import uuid4
 
 from langgraph.checkpoint.memory import MemorySaver
@@ -12,6 +13,8 @@ from revenueflow.services import get_or_create, record_turn
 _IN_POLICY = "qual o preço da bomba com 5% de desconto?"
 _OUT_OF_POLICY = "qual o preço da bomba com 40% de desconto?"
 _OUT_OF_POLICY_TARGET = "qual o preço da bomba? faz por R$ 1?"
+_QTY_FOLLOWUP = "qual o preço da bomba para 3 unidades?"
+_QUOTE_FOLLOWUP = "quero um orçamento"
 
 
 async def test_in_policy_discount_is_proposed_without_approval(db: None) -> None:
@@ -132,6 +135,75 @@ async def test_negotiation_turn_records_current_agent_on_session(db: None) -> No
         )
     assert row is not None
     assert row["current_agent"] == "negotiation"
+
+
+async def test_quantity_followup_reapplies_the_established_discount(db: None) -> None:
+    """Regression: a follow-up that only changes quantity ("qual o preço para
+    3 unidades?") never repeats the discount already negotiated. Found live:
+    negotiation_node treated the missing discount as "no discount asked" and
+    silently reset checkout_discount to 0 instead of re-proposing the same
+    rate for the new quantity."""
+
+    compiled = build_graph(MemorySaver())
+    conversation_id = f"c-neg-qty-{uuid4().hex}"
+    config = {"configurable": {"thread_id": conversation_id}}
+
+    first = await compiled.ainvoke(
+        {
+            "conversation_id": conversation_id,
+            "customer_text": _IN_POLICY,
+            "turn_id": f"t-{uuid4().hex}",
+        },
+        config=config,
+    )
+    assert first["final_outcome"] == "proposed"
+    established = Decimal(first["checkout_discount"])
+    assert established > 0
+
+    second = await compiled.ainvoke(
+        {
+            "conversation_id": conversation_id,
+            "customer_text": _QTY_FOLLOWUP,
+            "turn_id": f"t-{uuid4().hex}",
+        },
+        config=config,
+    )
+
+    assert second["requested_quantity"] == 3
+    assert Decimal(second["checkout_discount"]) == established
+
+
+async def test_closing_followup_keeps_the_established_quantity(db: None) -> None:
+    """Regression: a follow-up that repeats neither the product nor the
+    quantity ("quero um orçamento") never restates what a prior turn already
+    established. Found live: negotiation_node defaulted the missing quantity
+    to 1, silently dropping a 20-unit request back to a single unit right as
+    the customer tried to confirm ("pode faturar")."""
+
+    compiled = build_graph(MemorySaver())
+    conversation_id = f"c-neg-qty-close-{uuid4().hex}"
+    config = {"configurable": {"thread_id": conversation_id}}
+
+    first = await compiled.ainvoke(
+        {
+            "conversation_id": conversation_id,
+            "customer_text": _QTY_FOLLOWUP,
+            "turn_id": f"t-{uuid4().hex}",
+        },
+        config=config,
+    )
+    assert first["requested_quantity"] == 3
+
+    second = await compiled.ainvoke(
+        {
+            "conversation_id": conversation_id,
+            "customer_text": _QUOTE_FOLLOWUP,
+            "turn_id": f"t-{uuid4().hex}",
+        },
+        config=config,
+    )
+
+    assert second["requested_quantity"] == 3
 
 
 async def test_paused_turn_persists_a_checkpoint(db: None) -> None:
