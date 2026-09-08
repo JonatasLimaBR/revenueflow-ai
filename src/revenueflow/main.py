@@ -11,9 +11,13 @@ import asyncio
 import contextlib
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
+from typing import Any
 
 from fastapi import FastAPI, Request, Response
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+from psycopg import AsyncConnection
+from psycopg.rows import dict_row
+from psycopg_pool import AsyncConnectionPool
 
 from revenueflow.agents import build_graph
 from revenueflow.api import (
@@ -41,7 +45,25 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
         configure_otel()
     await open_pool()
-    async with AsyncPostgresSaver.from_conn_string(settings.database_url) as saver:
+    # AsyncPostgresSaver.from_conn_string holds ONE bare connection for the
+    # whole app lifetime, shared (behind the saver's own asyncio.Lock) by
+    # every concurrent turn's checkpoint I/O — found live: intermittent
+    # multi-minute turn stalls (up to ~5m) that neither the retry-fixed
+    # Vertex client (PR #82) nor the app's own pool (PR #83) explained,
+    # because this connection is a separate, still-unpooled path. The saver
+    # accepts an AsyncConnectionPool directly (checked via isinstance in its
+    # own __init__) — a stuck/broken connection then just gets replaced by
+    # the pool instead of wedging every future turn until instance restart.
+    checkpoint_pool: AsyncConnectionPool[AsyncConnection[dict[str, Any]]] = AsyncConnectionPool(
+        settings.database_url,
+        open=False,
+        min_size=2,
+        max_size=10,
+        kwargs={"autocommit": True, "prepare_threshold": 0, "row_factory": dict_row},
+    )
+    await checkpoint_pool.open()
+    try:
+        saver = AsyncPostgresSaver(checkpoint_pool)
         await saver.setup()
         set_graph(build_graph(saver))
         consumer: asyncio.Task[None] | None = None
@@ -54,6 +76,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 consumer.cancel()
                 with contextlib.suppress(asyncio.CancelledError):
                     await consumer
+    finally:
+        await checkpoint_pool.close()
     await close_pool()
 
 
