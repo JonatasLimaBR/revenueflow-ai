@@ -6,7 +6,7 @@
   <meta http-equiv="Content-Security-Policy"
         content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; frame-ancestors 'none'">
   <meta name="description"
-        content="RevenueFlow AI — agente comercial B2B via WhatsApp sobre GCP e Vertex AI. LLM interpreta, um Policy Engine determinístico decide, a API executa. 13 fatias entregues, do webhook ao contato ativo.">
+        content="RevenueFlow AI — agente comercial B2B via WhatsApp sobre GCP e Vertex AI. LLM interpreta, um Policy Engine determinístico decide, a API executa. 25 fatias entregues, do webhook ao portal operacional.">
   <title>RevenueFlow AI</title>
   <link rel="stylesheet" href="assets/styles.css">
 </head>
@@ -42,11 +42,11 @@
       </div>
       <div class="stats">
         <div class="stat">
-          <span class="stat__value">13</span>
+          <span class="stat__value">25</span>
           <span class="stat__label">fatias entregues</span>
         </div>
         <div class="stat">
-          <span class="stat__value">60</span>
+          <span class="stat__value">75</span>
           <span class="stat__label">ADRs documentados</span>
         </div>
         <div class="stat">
@@ -64,8 +64,8 @@
   <section id="fases" aria-labelledby="fases-title">
     <div class="container">
       <div class="section__head">
-        <span class="eyebrow">Do webhook ao contato ativo</span>
-        <h2 id="fases-title">Seis fases, treze fatias, uma jornada comercial completa</h2>
+        <span class="eyebrow">Do webhook ao portal operacional</span>
+        <h2 id="fases-title">Nove fases, vinte e cinco fatias, uma jornada comercial completa</h2>
         <p>
           Cada fatia foi entregue com o ciclo completo do projeto — Brainstorm, Define, Design,
           Build, Ship — e mergeada em <code>main</code> só depois de todos os checks do CI
@@ -195,6 +195,82 @@
             <div class="slice">
               <span class="slice__name">ACTIVE_SALES</span>
               <p>Um job em lote consome as oportunidades abertas e roda um <strong>Policy Gate</strong> de verdade — opt-out sempre vence, sem consentimento explícito ninguém é contatado, e há um limite de frequência por cliente — antes de enviar uma mensagem template pelo WhatsApp. Responder "PARAR" encerra o contato na hora, sem passar pelo modelo.</p>
+            </div>
+          </div>
+        </article>
+
+        <article class="phase">
+          <div class="phase__head">
+            <span class="phase__num" aria-hidden="true">7</span>
+            <div class="phase__title-group">
+              <h3>Analytics &amp; Revenue Intelligence</h3>
+              <p>Receita, margem e o ciclo de vida do lead deixam de ser uma consulta manual no banco e viram views prontas — no Postgres e sincronizadas com o BigQuery.</p>
+            </div>
+          </div>
+          <div class="slice-grid">
+            <div class="slice">
+              <span class="slice__name">ANALYTICS</span>
+              <p>Uma view calcula margem e receita recuperada por conversa; um job em lote sincroniza esse dado com o BigQuery — snapshot idempotente, resiliente por tabela, sem pipeline de streaming.</p>
+            </div>
+            <div class="slice">
+              <span class="slice__name">LEAD_LIFECYCLE</span>
+              <p>Todo lead avança por regra pura e monotônica — nunca do <code>NEW</code> direto pra <code>WON</code> — e vira um <code>Customer</code> real assim que fecha o primeiro pedido. Lead sem atividade recente é movido para <code>LOST</code> por um job separado.</p>
+            </div>
+            <div class="slice">
+              <span class="slice__name">ANALYTICS_360</span>
+              <p>Quatro views novas fecham os domínios de Customer 360, Lead 360, Opportunity 360 e Conversation Analytics do PRD-015 — sem dashboard ainda, mas com o dado já pronto pra consulta.</p>
+            </div>
+          </div>
+        </article>
+
+        <article class="phase">
+          <div class="phase__head">
+            <span class="phase__num" aria-hidden="true">8</span>
+            <div class="phase__title-group">
+              <h3>Domínio Próprio &amp; Acesso</h3>
+              <p>Esta página, o MCP público e o portal operacional ganham HTTPS num domínio real — e o sistema passa a ser consultável de fora do código, com o mesmo modelo de confiança das rotas internas.</p>
+            </div>
+          </div>
+          <div class="slice-grid">
+            <div class="slice">
+              <span class="slice__name">LANDING_PAGE</span>
+              <p>Este site — HTML estático em GCS atrás de um Load Balancer HTTP global com Cloud CDN, sem framework nem build step. Editar copy é um commit normal, não um <code>plan</code>/<code>apply</code>.</p>
+            </div>
+            <div class="slice">
+              <span class="slice__name">LANDING_PAGE_DOMAIN</span>
+              <p><code>mastavista.com.br</code> com certificado gerenciado e redirecionamento automático de HTTP para HTTPS — aditivo sobre o Load Balancer que já existia, nenhum recurso recriado do zero.</p>
+            </div>
+            <div class="slice">
+              <span class="slice__name">SUBDOMAINS</span>
+              <p><code>mcp.</code>/<code>portal.</code>/<code>langfuse.</code> roteados por hostname no mesmo Load Balancer — um certificado gerenciado multi-domínio em vez de um IP e um certificado por serviço.</p>
+            </div>
+            <div class="slice">
+              <span class="slice__name">MCP_SERVER</span> · <span class="slice__name">MCP_READONLY_PUBLIC</span>
+              <p>Um servidor MCP pessoal (stdio) e um público de só-leitura (HTTP) expõem o mesmo sistema para o Claude Desktop/Code — receita, Customer 360, aprovações pendentes — sem tool de escrita nova além das rotas internas já existentes.</p>
+            </div>
+            <div class="slice">
+              <span class="slice__name">DASHBOARD_ACCESS</span> · <span class="slice__name">WHATSAPP_CTA</span>
+              <p>Acesso de leitura ao dashboard do Cloud Monitoring por e-mail (<code>roles/monitoring.viewer</code>, nada mais amplo) e o CTA de WhatsApp desta própria página, apontando pro fluxo de produção sem formulário nem backend novo.</p>
+            </div>
+          </div>
+        </article>
+
+        <article class="phase">
+          <div class="phase__head">
+            <span class="phase__num" aria-hidden="true">9</span>
+            <div class="phase__title-group">
+              <h3>Portal &amp; Observabilidade</h3>
+              <p>Um jeito de operar o sistema sem abrir o Console do GCP — e de ver, em tempo real, qual agente está processando cada conversa.</p>
+            </div>
+          </div>
+          <div class="slice-grid">
+            <div class="slice">
+              <span class="slice__name">PORTAL</span>
+              <p>Portal operacional web — Google Sign-In + lista de e-mails permitidos, aprovar/rejeitar direto pelas mesmas rotas internas do MCP pessoal, e um painel que acende o nó ativo do grafo em tempo real via Postgres <code>LISTEN</code>/<code>NOTIFY</code>.</p>
+            </div>
+            <div class="slice">
+              <span class="slice__name">LANGFUSE_SELF_HOSTED</span>
+              <p>Langfuse self-hosted, controle total sobre o próprio dado de observabilidade — banco próprio no mesmo Cloud SQL, IP privado via VPC connector (nunca exposto à internet), atrás de um subdomínio fixo.</p>
             </div>
           </div>
         </article>
@@ -359,7 +435,7 @@
     <div class="container">
       <div class="section__head">
         <span class="eyebrow">O que vem a seguir</span>
-        <h2 id="roadmap-title">O roadmap não para nas 13 fatias entregues</h2>
+        <h2 id="roadmap-title">O roadmap não para nas 25 fatias entregues</h2>
         <p>Cada item abaixo é uma decisão já registrada em ADR — não uma promessa vaga de "em breve".</p>
       </div>
 
@@ -367,14 +443,14 @@
         <div class="timeline__item timeline__item--done">
           <span class="timeline__dot" aria-hidden="true"></span>
           <span class="timeline__tag">Você está aqui</span>
-          <h4>LANDING_PAGE</h4>
-          <p>Este site — GCS + Cloud CDN atrás de um Load Balancer HTTP global, sem domínio próprio ainda. Publicado direto do repositório, sem build step.</p>
+          <h4>LANGFUSE_SELF_HOSTED <code>ADR-075</code></h4>
+          <p>Langfuse self-hosted em produção — banco próprio, IP privado via VPC connector, subdomínio fixo. Onboarding manual em andamento: 1ª conta admin, par de API keys, e então <code>TRACER_SINK</code> vira <code>langfuse</code>.</p>
         </div>
         <div class="timeline__item">
           <span class="timeline__dot" aria-hidden="true"></span>
           <span class="timeline__tag">Próxima fatia</span>
-          <h4>ANALYTICS <code>PRD-015</code></h4>
-          <p>Revenue Intelligence sobre o que já está sendo auditado — conversão de oportunidade em pedido, custo de IA por receita gerada, taxa de resposta e opt-out do contato ativo.</p>
+          <h4>TTL de aprovações, propostas e handoffs</h4>
+          <p>Rotina de expiração automática pra tudo que fica pendente de decisão humana — hoje só a <code>Approval</code> tem <code>expires_at</code>; <code>Quote</code> e <code>Handoff</code> ainda não.</p>
         </div>
       </div>
 
@@ -383,10 +459,10 @@
         <ul>
           <li>Cloud Scheduler encadeando os jobs de detecção de oportunidade e campanha (hoje rodam sob demanda)</li>
           <li>WhatsApp Message Templates (HSM) aprovados pela Meta para contato fora da janela de 24h</li>
-          <li>Domínio próprio + HTTPS para esta landing page (a infra de CDN já está pronta para o upgrade)</li>
           <li>Fluxo de opt-in via WhatsApp, simétrico ao guard de opt-out já em produção</li>
           <li>Os 6 tipos de oportunidade do PRD-010 ainda não implementados (hoje: recompra atrasada e proposta parada)</li>
-          <li>Rotina de expiração (TTL) para aprovações, propostas e handoffs pendentes</li>
+          <li>Popular <code>consent_opt_in_at</code> de clientes reais (deferido até o cliente responder no WhatsApp)</li>
+          <li>Dashboard/Looker Studio sobre as views de Analytics 360 (o dado já existe, a visualização ainda não)</li>
         </ul>
       </div>
     </div>
