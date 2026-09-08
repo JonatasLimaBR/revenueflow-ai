@@ -1,8 +1,122 @@
 [
-  { "product_id": "PMP-050-PER", "unit_cost": 197.94, "min_margin_pct": 0.15 },
-  { "product_id": "PMP-100-PER", "unit_cost": 287.94, "min_margin_pct": 0.15 },
-  { "product_id": "PMP-100-CEN", "unit_cost": 389.94, "min_margin_pct": 0.15 },
-  { "product_id": "PMP-200-CEN", "unit_cost": 629.94, "min_margin_pct": 0.15 },
-  { "product_id": "PMP-075-SUB", "unit_cost": 479.94, "min_margin_pct": 0.15 },
-  { "product_id": "PMP-300-PRE", "unit_cost": 1157.94, "min_margin_pct": 0.15 }
+  {
+    "product_id": "PMP-033-PER",
+    "unit_cost": 152.35,
+    "min_margin_pct": 0.15
+  },
+  {
+    "product_id": "PMP-050-PER",
+    "unit_cost": 197.94,
+    "min_margin_pct": 0.15
+  },
+  {
+    "product_id": "PMP-075-PER",
+    "unit_cost": 238.71,
+    "min_margin_pct": 0.15
+  },
+  {
+    "product_id": "PMP-100-PER",
+    "unit_cost": 287.94,
+    "min_margin_pct": 0.15
+  },
+  {
+    "product_id": "PMP-150-PER",
+    "unit_cost": 350.47,
+    "min_margin_pct": 0.15
+  },
+  {
+    "product_id": "PMP-100-CEN",
+    "unit_cost": 389.94,
+    "min_margin_pct": 0.15
+  },
+  {
+    "product_id": "PMP-150-CEN",
+    "unit_cost": 482.55,
+    "min_margin_pct": 0.15
+  },
+  {
+    "product_id": "PMP-200-CEN",
+    "unit_cost": 629.94,
+    "min_margin_pct": 0.15
+  },
+  {
+    "product_id": "PMP-300-CEN",
+    "unit_cost": 863.55,
+    "min_margin_pct": 0.15
+  },
+  {
+    "product_id": "PMP-500-CEN",
+    "unit_cost": 1473.15,
+    "min_margin_pct": 0.15
+  },
+  {
+    "product_id": "PMP-050-SUB",
+    "unit_cost": 330.15,
+    "min_margin_pct": 0.15
+  },
+  {
+    "product_id": "PMP-075-SUB",
+    "unit_cost": 479.94,
+    "min_margin_pct": 0.15
+  },
+  {
+    "product_id": "PMP-100-SUB",
+    "unit_cost": 634.95,
+    "min_margin_pct": 0.15
+  },
+  {
+    "product_id": "PMP-150-SUB",
+    "unit_cost": 965.15,
+    "min_margin_pct": 0.15
+  },
+  {
+    "product_id": "PMP-050-PRE",
+    "unit_cost": 233.63,
+    "min_margin_pct": 0.15
+  },
+  {
+    "product_id": "PMP-100-PRE",
+    "unit_cost": 457.15,
+    "min_margin_pct": 0.15
+  },
+  {
+    "product_id": "PMP-200-PRE",
+    "unit_cost": 787.35,
+    "min_margin_pct": 0.15
+  },
+  {
+    "product_id": "PMP-300-PRE",
+    "unit_cost": 1157.94,
+    "min_margin_pct": 0.15
+  },
+  {
+    "product_id": "MTB-550-GAS",
+    "unit_cost": 909.27,
+    "min_margin_pct": 0.15
+  },
+  {
+    "product_id": "MTB-900-DIE",
+    "unit_cost": 2489.15,
+    "min_margin_pct": 0.15
+  },
+  {
+    "product_id": "KIT-100-RES",
+    "unit_cost": 558.75,
+    "min_margin_pct": 0.15
+  },
+  {
+    "product_id": "ACC-CAP-250",
+    "unit_cost": 20.27,
+    "min_margin_pct": 0.15
+  },
+  {
+    "product_id": "ACC-BOI-ELE",
+    "unit_cost": 30.43,
+    "min_margin_pct": 0.15
+  },
+  {
+    "product_id": "ACC-MAN-25M",
+    "unit_cost": 111.71,
+    "min_margin_pct": 0.15
+  }
 ]

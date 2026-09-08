@@ -1,8 +1,146 @@
 [
-  { "product_id": "PMP-050-PER", "available": 120, "reserved": 12, "lead_time_days": 2 },
-  { "product_id": "PMP-100-PER", "available": 45, "reserved": 8, "lead_time_days": 3 },
-  { "product_id": "PMP-100-CEN", "available": 6, "reserved": 4, "lead_time_days": 7 },
-  { "product_id": "PMP-200-CEN", "available": 0, "reserved": 0, "lead_time_days": 21 },
-  { "product_id": "PMP-075-SUB", "available": 18, "reserved": 2, "lead_time_days": 5 },
-  { "product_id": "PMP-300-PRE", "available": 2, "reserved": 1, "lead_time_days": 30 }
+  {
+    "product_id": "PMP-033-PER",
+    "available": 7,
+    "reserved": 0,
+    "lead_time_days": 5
+  },
+  {
+    "product_id": "PMP-050-PER",
+    "available": 109,
+    "reserved": 8,
+    "lead_time_days": 3
+  },
+  {
+    "product_id": "PMP-075-PER",
+    "available": 43,
+    "reserved": 4,
+    "lead_time_days": 2
+  },
+  {
+    "product_id": "PMP-100-PER",
+    "available": 0,
+    "reserved": 0,
+    "lead_time_days": 30
+  },
+  {
+    "product_id": "PMP-150-PER",
+    "available": 109,
+    "reserved": 2,
+    "lead_time_days": 5
+  },
+  {
+    "product_id": "PMP-100-CEN",
+    "available": 2,
+    "reserved": 0,
+    "lead_time_days": 5
+  },
+  {
+    "product_id": "PMP-150-CEN",
+    "available": 42,
+    "reserved": 7,
+    "lead_time_days": 2
+  },
+  {
+    "product_id": "PMP-200-CEN",
+    "available": 86,
+    "reserved": 6,
+    "lead_time_days": 5
+  },
+  {
+    "product_id": "PMP-300-CEN",
+    "available": 43,
+    "reserved": 14,
+    "lead_time_days": 4
+  },
+  {
+    "product_id": "PMP-500-CEN",
+    "available": 118,
+    "reserved": 0,
+    "lead_time_days": 3
+  },
+  {
+    "product_id": "PMP-050-SUB",
+    "available": 7,
+    "reserved": 1,
+    "lead_time_days": 7
+  },
+  {
+    "product_id": "PMP-075-SUB",
+    "available": 50,
+    "reserved": 4,
+    "lead_time_days": 3
+  },
+  {
+    "product_id": "PMP-100-SUB",
+    "available": 112,
+    "reserved": 10,
+    "lead_time_days": 2
+  },
+  {
+    "product_id": "PMP-150-SUB",
+    "available": 26,
+    "reserved": 12,
+    "lead_time_days": 2
+  },
+  {
+    "product_id": "PMP-050-PRE",
+    "available": 0,
+    "reserved": 0,
+    "lead_time_days": 21
+  },
+  {
+    "product_id": "PMP-100-PRE",
+    "available": 8,
+    "reserved": 1,
+    "lead_time_days": 9
+  },
+  {
+    "product_id": "PMP-200-PRE",
+    "available": 48,
+    "reserved": 1,
+    "lead_time_days": 5
+  },
+  {
+    "product_id": "PMP-300-PRE",
+    "available": 83,
+    "reserved": 3,
+    "lead_time_days": 5
+  },
+  {
+    "product_id": "MTB-550-GAS",
+    "available": 25,
+    "reserved": 9,
+    "lead_time_days": 4
+  },
+  {
+    "product_id": "MTB-900-DIE",
+    "available": 88,
+    "reserved": 6,
+    "lead_time_days": 2
+  },
+  {
+    "product_id": "KIT-100-RES",
+    "available": 2,
+    "reserved": 2,
+    "lead_time_days": 6
+  },
+  {
+    "product_id": "ACC-CAP-250",
+    "available": 113,
+    "reserved": 9,
+    "lead_time_days": 2
+  },
+  {
+    "product_id": "ACC-BOI-ELE",
+    "available": 124,
+    "reserved": 7,
+    "lead_time_days": 2
+  },
+  {
+    "product_id": "ACC-MAN-25M",
+    "available": 63,
+    "reserved": 8,
+    "lead_time_days": 5
+  }
 ]

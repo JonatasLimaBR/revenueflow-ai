@@ -1,68 +1,599 @@
 [
   {
+    "product_id": "PMP-033-PER",
+    "name": "Bomba d'água periférica 1/3CV 127V",
+    "category": "bomba d'água periférica",
+    "attrs": {
+      "hp": 0.33,
+      "voltage": "127V",
+      "max_flow_lph": 1800,
+      "inlet_mm": 20
+    },
+    "price_tiers": [
+      {
+        "min_qty": 1,
+        "unit_price": 299.9
+      },
+      {
+        "min_qty": 5,
+        "unit_price": 279.9
+      },
+      {
+        "min_qty": 20,
+        "unit_price": 259.9
+      }
+    ]
+  },
+  {
     "product_id": "PMP-050-PER",
     "name": "Bomba d'água periférica 1/2CV 127V",
     "category": "bomba d'água periférica",
-    "attrs": { "hp": 0.5, "voltage": "127V", "max_flow_lph": 2400, "inlet_mm": 25 },
+    "attrs": {
+      "hp": 0.5,
+      "voltage": "127V",
+      "max_flow_lph": 2400,
+      "inlet_mm": 25
+    },
     "price_tiers": [
-      { "min_qty": 1, "unit_price": 389.90 },
-      { "min_qty": 5, "unit_price": 359.90 },
-      { "min_qty": 20, "unit_price": 329.90 }
+      {
+        "min_qty": 1,
+        "unit_price": 389.9
+      },
+      {
+        "min_qty": 5,
+        "unit_price": 359.9
+      },
+      {
+        "min_qty": 20,
+        "unit_price": 329.9
+      }
+    ]
+  },
+  {
+    "product_id": "PMP-075-PER",
+    "name": "Bomba d'água periférica 3/4CV 127/220V",
+    "category": "bomba d'água periférica",
+    "attrs": {
+      "hp": 0.75,
+      "voltage": "127/220V",
+      "max_flow_lph": 3000,
+      "inlet_mm": 25
+    },
+    "price_tiers": [
+      {
+        "min_qty": 1,
+        "unit_price": 469.9
+      },
+      {
+        "min_qty": 5,
+        "unit_price": 439.9
+      },
+      {
+        "min_qty": 20,
+        "unit_price": 409.9
+      }
     ]
   },
   {
     "product_id": "PMP-100-PER",
     "name": "Bomba d'água periférica 1CV 127/220V",
     "category": "bomba d'água periférica",
-    "attrs": { "hp": 1.0, "voltage": "127/220V", "max_flow_lph": 3600, "inlet_mm": 25 },
+    "attrs": {
+      "hp": 1.0,
+      "voltage": "127/220V",
+      "max_flow_lph": 3600,
+      "inlet_mm": 25
+    },
     "price_tiers": [
-      { "min_qty": 1, "unit_price": 549.90 },
-      { "min_qty": 5, "unit_price": 512.90 },
-      { "min_qty": 20, "unit_price": 479.90 }
+      {
+        "min_qty": 1,
+        "unit_price": 549.9
+      },
+      {
+        "min_qty": 5,
+        "unit_price": 512.9
+      },
+      {
+        "min_qty": 20,
+        "unit_price": 479.9
+      }
+    ]
+  },
+  {
+    "product_id": "PMP-150-PER",
+    "name": "Bomba d'água periférica 1.5CV 220V",
+    "category": "bomba d'água periférica",
+    "attrs": {
+      "hp": 1.5,
+      "voltage": "220V",
+      "max_flow_lph": 4800,
+      "inlet_mm": 32
+    },
+    "price_tiers": [
+      {
+        "min_qty": 1,
+        "unit_price": 689.9
+      },
+      {
+        "min_qty": 4,
+        "unit_price": 649.9
+      },
+      {
+        "min_qty": 15,
+        "unit_price": 609.9
+      }
     ]
   },
   {
     "product_id": "PMP-100-CEN",
     "name": "Bomba d'água centrífuga 1CV 220V",
     "category": "bomba d'água centrífuga",
-    "attrs": { "hp": 1.0, "voltage": "220V", "max_flow_lph": 9000, "inlet_mm": 32 },
+    "attrs": {
+      "hp": 1.0,
+      "voltage": "220V",
+      "max_flow_lph": 9000,
+      "inlet_mm": 32
+    },
     "price_tiers": [
-      { "min_qty": 1, "unit_price": 729.90 },
-      { "min_qty": 4, "unit_price": 689.90 },
-      { "min_qty": 12, "unit_price": 649.90 }
+      {
+        "min_qty": 1,
+        "unit_price": 729.9
+      },
+      {
+        "min_qty": 4,
+        "unit_price": 689.9
+      },
+      {
+        "min_qty": 12,
+        "unit_price": 649.9
+      }
+    ]
+  },
+  {
+    "product_id": "PMP-150-CEN",
+    "name": "Bomba d'água centrífuga 1.5CV 220V",
+    "category": "bomba d'água centrífuga",
+    "attrs": {
+      "hp": 1.5,
+      "voltage": "220V",
+      "max_flow_lph": 12000,
+      "inlet_mm": 40
+    },
+    "price_tiers": [
+      {
+        "min_qty": 1,
+        "unit_price": 949.9
+      },
+      {
+        "min_qty": 4,
+        "unit_price": 899.9
+      },
+      {
+        "min_qty": 12,
+        "unit_price": 849.9
+      }
     ]
   },
   {
     "product_id": "PMP-200-CEN",
     "name": "Bomba d'água centrífuga 2CV 220V",
     "category": "bomba d'água centrífuga",
-    "attrs": { "hp": 2.0, "voltage": "220V", "max_flow_lph": 15000, "inlet_mm": 50 },
+    "attrs": {
+      "hp": 2.0,
+      "voltage": "220V",
+      "max_flow_lph": 15000,
+      "inlet_mm": 50
+    },
     "price_tiers": [
-      { "min_qty": 1, "unit_price": 1189.90 },
-      { "min_qty": 4, "unit_price": 1119.90 },
-      { "min_qty": 10, "unit_price": 1049.90 }
+      {
+        "min_qty": 1,
+        "unit_price": 1189.9
+      },
+      {
+        "min_qty": 4,
+        "unit_price": 1119.9
+      },
+      {
+        "min_qty": 10,
+        "unit_price": 1049.9
+      }
+    ]
+  },
+  {
+    "product_id": "PMP-300-CEN",
+    "name": "Bomba d'água centrífuga 3CV 220V trifásica",
+    "category": "bomba d'água centrífuga",
+    "attrs": {
+      "hp": 3.0,
+      "voltage": "220V trifásica",
+      "max_flow_lph": 21000,
+      "inlet_mm": 50
+    },
+    "price_tiers": [
+      {
+        "min_qty": 1,
+        "unit_price": 1699.9
+      },
+      {
+        "min_qty": 3,
+        "unit_price": 1599.9
+      },
+      {
+        "min_qty": 8,
+        "unit_price": 1499.9
+      }
+    ]
+  },
+  {
+    "product_id": "PMP-500-CEN",
+    "name": "Bomba d'água centrífuga 5CV 220/380V trifásica",
+    "category": "bomba d'água centrífuga",
+    "attrs": {
+      "hp": 5.0,
+      "voltage": "220/380V trifásica",
+      "max_flow_lph": 33000,
+      "inlet_mm": 63
+    },
+    "price_tiers": [
+      {
+        "min_qty": 1,
+        "unit_price": 2899.9
+      },
+      {
+        "min_qty": 2,
+        "unit_price": 2749.9
+      },
+      {
+        "min_qty": 6,
+        "unit_price": 2599.9
+      }
+    ]
+  },
+  {
+    "product_id": "PMP-050-SUB",
+    "name": "Bomba d'água submersa 1/2CV 220V para poço",
+    "category": "bomba d'água submersa",
+    "attrs": {
+      "hp": 0.5,
+      "voltage": "220V",
+      "max_flow_lph": 3000,
+      "outlet_mm": 25
+    },
+    "price_tiers": [
+      {
+        "min_qty": 1,
+        "unit_price": 649.9
+      },
+      {
+        "min_qty": 3,
+        "unit_price": 609.9
+      },
+      {
+        "min_qty": 10,
+        "unit_price": 569.9
+      }
     ]
   },
   {
     "product_id": "PMP-075-SUB",
     "name": "Bomba d'água submersa 3/4CV 220V para poço",
     "category": "bomba d'água submersa",
-    "attrs": { "hp": 0.75, "voltage": "220V", "max_flow_lph": 4200, "outlet_mm": 25 },
+    "attrs": {
+      "hp": 0.75,
+      "voltage": "220V",
+      "max_flow_lph": 4200,
+      "outlet_mm": 25
+    },
     "price_tiers": [
-      { "min_qty": 1, "unit_price": 899.90 },
-      { "min_qty": 3, "unit_price": 849.90 },
-      { "min_qty": 10, "unit_price": 799.90 }
+      {
+        "min_qty": 1,
+        "unit_price": 899.9
+      },
+      {
+        "min_qty": 3,
+        "unit_price": 849.9
+      },
+      {
+        "min_qty": 10,
+        "unit_price": 799.9
+      }
+    ]
+  },
+  {
+    "product_id": "PMP-100-SUB",
+    "name": "Bomba d'água submersa 1CV 220V para poço profundo",
+    "category": "bomba d'água submersa",
+    "attrs": {
+      "hp": 1.0,
+      "voltage": "220V",
+      "max_flow_lph": 5400,
+      "outlet_mm": 32
+    },
+    "price_tiers": [
+      {
+        "min_qty": 1,
+        "unit_price": 1249.9
+      },
+      {
+        "min_qty": 3,
+        "unit_price": 1179.9
+      },
+      {
+        "min_qty": 8,
+        "unit_price": 1099.9
+      }
+    ]
+  },
+  {
+    "product_id": "PMP-150-SUB",
+    "name": "Bomba d'água submersa 1.5CV trifásica para poço profundo",
+    "category": "bomba d'água submersa",
+    "attrs": {
+      "hp": 1.5,
+      "voltage": "220/380V trifásica",
+      "max_flow_lph": 7200,
+      "outlet_mm": 32
+    },
+    "price_tiers": [
+      {
+        "min_qty": 1,
+        "unit_price": 1899.9
+      },
+      {
+        "min_qty": 2,
+        "unit_price": 1799.9
+      },
+      {
+        "min_qty": 6,
+        "unit_price": 1699.9
+      }
+    ]
+  },
+  {
+    "product_id": "PMP-050-PRE",
+    "name": "Bomba d'água pressurizadora 1/2CV 127V residencial",
+    "category": "bomba d'água pressurizadora",
+    "attrs": {
+      "hp": 0.5,
+      "voltage": "127V",
+      "max_flow_lph": 2700,
+      "inlet_mm": 25
+    },
+    "price_tiers": [
+      {
+        "min_qty": 1,
+        "unit_price": 459.9
+      },
+      {
+        "min_qty": 4,
+        "unit_price": 429.9
+      },
+      {
+        "min_qty": 15,
+        "unit_price": 399.9
+      }
+    ]
+  },
+  {
+    "product_id": "PMP-100-PRE",
+    "name": "Bomba d'água pressurizadora 1CV 220V residencial/comercial",
+    "category": "bomba d'água pressurizadora",
+    "attrs": {
+      "hp": 1.0,
+      "voltage": "220V",
+      "max_flow_lph": 5400,
+      "inlet_mm": 32
+    },
+    "price_tiers": [
+      {
+        "min_qty": 1,
+        "unit_price": 899.9
+      },
+      {
+        "min_qty": 3,
+        "unit_price": 849.9
+      },
+      {
+        "min_qty": 10,
+        "unit_price": 799.9
+      }
+    ]
+  },
+  {
+    "product_id": "PMP-200-PRE",
+    "name": "Bomba d'água pressurizadora 2CV 220V comercial",
+    "category": "bomba d'água pressurizadora",
+    "attrs": {
+      "hp": 2.0,
+      "voltage": "220V",
+      "max_flow_lph": 10800,
+      "inlet_mm": 40
+    },
+    "price_tiers": [
+      {
+        "min_qty": 1,
+        "unit_price": 1549.9
+      },
+      {
+        "min_qty": 3,
+        "unit_price": 1469.9
+      },
+      {
+        "min_qty": 8,
+        "unit_price": 1389.9
+      }
     ]
   },
   {
     "product_id": "PMP-300-PRE",
     "name": "Bomba d'água pressurizadora 3CV 220V trifásica",
     "category": "bomba d'água pressurizadora",
-    "attrs": { "hp": 3.0, "voltage": "220V", "max_flow_lph": 21000, "inlet_mm": 50 },
+    "attrs": {
+      "hp": 3.0,
+      "voltage": "220V",
+      "max_flow_lph": 21000,
+      "inlet_mm": 50
+    },
     "price_tiers": [
-      { "min_qty": 1, "unit_price": 2149.90 },
-      { "min_qty": 3, "unit_price": 2039.90 },
-      { "min_qty": 8, "unit_price": 1929.90 }
+      {
+        "min_qty": 1,
+        "unit_price": 2149.9
+      },
+      {
+        "min_qty": 3,
+        "unit_price": 2039.9
+      },
+      {
+        "min_qty": 8,
+        "unit_price": 1929.9
+      }
+    ]
+  },
+  {
+    "product_id": "MTB-550-GAS",
+    "name": "Motobomba a gasolina 5.5HP autoescorvante 2\"",
+    "category": "motobomba a combustão",
+    "attrs": {
+      "hp": 5.5,
+      "fuel": "gasolina",
+      "max_flow_lph": 30000,
+      "inlet_mm": 50
+    },
+    "price_tiers": [
+      {
+        "min_qty": 1,
+        "unit_price": 1789.9
+      },
+      {
+        "min_qty": 2,
+        "unit_price": 1699.9
+      },
+      {
+        "min_qty": 6,
+        "unit_price": 1599.9
+      }
+    ]
+  },
+  {
+    "product_id": "MTB-900-DIE",
+    "name": "Motobomba a diesel 9HP alta vazão 3\"",
+    "category": "motobomba a combustão",
+    "attrs": {
+      "hp": 9.0,
+      "fuel": "diesel",
+      "max_flow_lph": 54000,
+      "inlet_mm": 75
+    },
+    "price_tiers": [
+      {
+        "min_qty": 1,
+        "unit_price": 4899.9
+      },
+      {
+        "min_qty": 2,
+        "unit_price": 4699.9
+      },
+      {
+        "min_qty": 5,
+        "unit_price": 4499.9
+      }
+    ]
+  },
+  {
+    "product_id": "KIT-100-RES",
+    "name": "Kit pressurizador residencial 1CV com pressostato",
+    "category": "kit pressurizador",
+    "attrs": {
+      "hp": 1.0,
+      "voltage": "220V",
+      "includes": [
+        "bomba",
+        "pressostato",
+        "manômetro"
+      ]
+    },
+    "price_tiers": [
+      {
+        "min_qty": 1,
+        "unit_price": 1099.9
+      },
+      {
+        "min_qty": 3,
+        "unit_price": 1039.9
+      },
+      {
+        "min_qty": 8,
+        "unit_price": 979.9
+      }
+    ]
+  },
+  {
+    "product_id": "ACC-CAP-250",
+    "name": "Capacitor de partida 250uF",
+    "category": "acessório",
+    "attrs": {
+      "capacitance_uf": 250,
+      "voltage": "220V"
+    },
+    "price_tiers": [
+      {
+        "min_qty": 1,
+        "unit_price": 39.9
+      },
+      {
+        "min_qty": 10,
+        "unit_price": 34.9
+      },
+      {
+        "min_qty": 50,
+        "unit_price": 29.9
+      }
+    ]
+  },
+  {
+    "product_id": "ACC-BOI-ELE",
+    "name": "Chave bóia elétrica para caixa d'água",
+    "category": "acessório",
+    "attrs": {
+      "type": "elétrica",
+      "cable_length_m": 3
+    },
+    "price_tiers": [
+      {
+        "min_qty": 1,
+        "unit_price": 59.9
+      },
+      {
+        "min_qty": 10,
+        "unit_price": 52.9
+      },
+      {
+        "min_qty": 40,
+        "unit_price": 45.9
+      }
+    ]
+  },
+  {
+    "product_id": "ACC-MAN-25M",
+    "name": "Mangueira de sucção reforçada 25m x 1\"",
+    "category": "acessório",
+    "attrs": {
+      "length_m": 25,
+      "diameter_in": 1
+    },
+    "price_tiers": [
+      {
+        "min_qty": 1,
+        "unit_price": 219.9
+      },
+      {
+        "min_qty": 5,
+        "unit_price": 199.9
+      },
+      {
+        "min_qty": 20,
+        "unit_price": 179.9
+      }
     ]
   }
 ]
