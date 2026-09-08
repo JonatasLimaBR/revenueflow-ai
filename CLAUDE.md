@@ -249,6 +249,29 @@ Fatias entregues, arquivadas em `.claude/sdd/archive/`:
   certificado antigo antes de criar o novo); corrigido com `lifecycle { create_before_destroy =
   true }` + nome do certificado derivado de um hash dos domínios (senão colidiria com o nome fixo
   do antigo durante a transição).
+- **LANGFUSE_SELF_HOSTED** (2026-09-08, ADR-075) — fecha a lacuna achada ao investigar por que o
+  portal não mostrava nada de observabilidade: `TRACER_SINK` real em produção nunca saiu de `noop`
+  (ADR-056 documentou a troca pra `otel`, mas o `terraform.tfvars` real nunca foi atualizado).
+  Usuário pediu explicitamente pra resolver e escolheu self-hosted completo (controle total) em vez
+  de Langfuse Cloud SaaS. Novo Cloud Run service `revenueflow-api-langfuse`
+  (`infra/terraform/langfuse_service.tf`), mesma imagem pública `langfuse/langfuse:2` do
+  `docker-compose.yml` local — sem build próprio. Banco próprio (`google_sql_database`/
+  `google_sql_user` `langfuse`) na MESMA instância Cloud SQL já existente (`cloud_sql.tf`), DSN via
+  IP público + `sslmode=require` (não o socket unix `/cloudsql/...` que os pools `psycopg` da app
+  usam — o cliente Prisma/Node do Langfuse não fala essa convenção). Subdomínio fixo
+  `langfuse.mastavista.com.br` (mesmo padrão Serverless NEG + backend service do ADR-074) em vez da
+  URL `*.run.app` do Cloud Run — resolve de saída o ovo-e-galinha do `NEXTAUTH_URL` (precisa ser
+  conhecido antes do 1º boot; a URL do Cloud Run só existe depois do serviço criado). Certificado
+  gerenciado ganha esse 4º domínio (mesma janela de reprovisionamento já aceita no ADR-074). 3
+  secrets novos Terraform-gerados (`secrets.tf`, mesmo padrão dos tokens approval/handoff/mcp —
+  não travam o deploy num passo manual): `revenueflow-langfuse-database-url`,
+  `revenueflow-langfuse-nextauth-secret`, `revenueflow-langfuse-salt`. `LANGFUSE_PUBLIC_KEY`/
+  `LANGFUSE_SECRET_KEY` continuam manuais (só existem depois do 1º login gerar o par de API keys na
+  própria UI). `var.tracer_sink` continua `noop` nesta fatia — vira `langfuse` numa troca de
+  `tfvars` separada, só depois do passo manual. `AUTH_DISABLE_SIGNUP` controlado por
+  `var.langfuse_disable_signup` (default `false`, signup aberto até a 1ª conta admin existir).
+  **Sem** automatizar a conta admin/API keys via Terraform, sem instância Cloud SQL dedicada
+  (ADR-075).
 
 Deploy: **auditoria em 2026-09-05 (ADR-069 a 072) achou que nenhum deploy real tinha rodado desde
 CUSTOMER_360 (2026-09-03)** — o ambiente GitHub `production` tem um gate de aprovação manual
@@ -391,9 +414,13 @@ GitHub Actions repo variables (✅ `jonalic@gmail.com`, `DASHBOARD_VIEWER_EMAILS
 token do MCP público (✅ distribuído — usuário configurou o conector no claude.ai com
 `mcp.mastavista.com.br`), OAuth Client ID do portal (✅ configurado, login real confirmado
 funcionando com 3 contas), latência do primeiro turno (✅ investigada e corrigida — ver cadeia de
-6 fixes acima). **Restam**: popular `consent_opt_in_at` de clientes reais (deferido
+6 fixes acima), negociação perdendo contexto de desconto/quantidade em follow-up (✅ corrigido —
+`negotiation_node` reaplica o desconto/quantidade já estabelecidos quando o turno atual não os
+repete, PR #94). **Restam**: popular `consent_opt_in_at` de clientes reais (deferido
 deliberadamente — só quando o cliente responder no WhatsApp, per decisão do usuário), e subir
-Langfuse em produção (achado acima, ainda pendente).
+Langfuse em produção (infra pronta no ADR-075 — Cloud Run/banco/secrets/subdomínio; falta o DNS de
+`langfuse.mastavista.com.br`, criar a 1ª conta admin, gerar o par de API keys, popular
+`LANGFUSE_PUBLIC_KEY`/`LANGFUSE_SECRET_KEY`, e virar `var.tracer_sink` pra `"langfuse"`).
 
 O código de aplicação **existe** e não é mais scaffolding.
 
@@ -705,3 +732,4 @@ Claude deve localizar e ler os documentos relacionados antes de implementar.
 - [ADR-072 — Correção do ADR-071: value_extractor só existe pra métrica DISTRIBUTION](docs/adrs/adr-072-value-extractor-requires-distribution.md)
 - [ADR-073 — Portal operacional: Google Sign-In + wrapper sobre rotas internas + painel ao vivo via Postgres LISTEN/NOTIFY](docs/adrs/adr-073-operational-portal.md)
 - [ADR-074 — Subdomínios mcp./portal. via Serverless NEG no mesmo Load Balancer (ADR-068 estendido)](docs/adrs/adr-074-mcp-and-portal-subdomains.md)
+- [ADR-075 — Langfuse self-hosted em produção (ADR-045 emendado)](docs/adrs/adr-075-langfuse-self-hosted-production.md)

@@ -119,6 +119,70 @@ resource "google_secret_manager_secret_version" "portal_session_secret" {
   secret_data = random_password.portal_session_secret.result
 }
 
+# Langfuse's own Postgres DSN (its Prisma/Node client, unlike the app's
+# psycopg pools, doesn't speak the /cloudsql unix-socket DSN convention — a
+# plain host:port DSN against the instance's existing public IP, same
+# ssl_mode=ENCRYPTED_ONLY the instance already enforces).
+resource "google_secret_manager_secret" "langfuse_db_url" {
+  secret_id = "revenueflow-langfuse-database-url"
+
+  replication {
+    auto {}
+  }
+
+  depends_on = [google_project_service.this]
+}
+
+resource "google_secret_manager_secret_version" "langfuse_db_url" {
+  secret      = google_secret_manager_secret.langfuse_db_url.id
+  secret_data = "postgresql://${google_sql_user.langfuse.name}:${random_password.langfuse_db.result}@${google_sql_database_instance.oltp.public_ip_address}:5432/${google_sql_database.langfuse.name}?sslmode=require"
+}
+
+# Langfuse's NextAuth cookie-signing secret and password-hashing salt —
+# Terraform-generated, same not-gated-on-a-manual-step pattern as the
+# approval/handoff/mcp/portal_session tokens above. Read either with:
+#   gcloud secrets versions access latest --secret=revenueflow-langfuse-nextauth-secret
+#   gcloud secrets versions access latest --secret=revenueflow-langfuse-salt
+resource "google_secret_manager_secret" "langfuse_nextauth_secret" {
+  secret_id = "revenueflow-langfuse-nextauth-secret"
+
+  replication {
+    auto {}
+  }
+
+  depends_on = [google_project_service.this]
+}
+
+resource "random_password" "langfuse_nextauth_secret" {
+  length  = 48
+  special = false
+}
+
+resource "google_secret_manager_secret_version" "langfuse_nextauth_secret" {
+  secret      = google_secret_manager_secret.langfuse_nextauth_secret.id
+  secret_data = random_password.langfuse_nextauth_secret.result
+}
+
+resource "google_secret_manager_secret" "langfuse_salt" {
+  secret_id = "revenueflow-langfuse-salt"
+
+  replication {
+    auto {}
+  }
+
+  depends_on = [google_project_service.this]
+}
+
+resource "random_password" "langfuse_salt" {
+  length  = 48
+  special = false
+}
+
+resource "google_secret_manager_secret_version" "langfuse_salt" {
+  secret      = google_secret_manager_secret.langfuse_salt.id
+  secret_data = random_password.langfuse_salt.result
+}
+
 resource "google_secret_manager_secret_iam_member" "api_manual" {
   for_each  = google_secret_manager_secret.manual
   secret_id = each.value.secret_id
@@ -128,6 +192,26 @@ resource "google_secret_manager_secret_iam_member" "api_manual" {
 
 resource "google_secret_manager_secret_iam_member" "api_db_url" {
   secret_id = google_secret_manager_secret.db_url.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.api.email}"
+}
+
+# Langfuse's own secrets (langfuse_service.tf) — the api service account is
+# reused for this Cloud Run service too, same as portal/mcp_readonly.
+resource "google_secret_manager_secret_iam_member" "langfuse_db_url" {
+  secret_id = google_secret_manager_secret.langfuse_db_url.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.api.email}"
+}
+
+resource "google_secret_manager_secret_iam_member" "langfuse_nextauth_secret" {
+  secret_id = google_secret_manager_secret.langfuse_nextauth_secret.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.api.email}"
+}
+
+resource "google_secret_manager_secret_iam_member" "langfuse_salt" {
+  secret_id = google_secret_manager_secret.langfuse_salt.secret_id
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${google_service_account.api.email}"
 }

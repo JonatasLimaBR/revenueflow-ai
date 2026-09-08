@@ -2,8 +2,9 @@
 # the landing page's existing global Load Balancer (ADR-068) via Serverless
 # NEG backends — same IP, same cert (extended), no new LB/IP.
 locals {
-  mcp_subdomain    = var.landing_domain != "" ? "mcp.${var.landing_domain}" : ""
-  portal_subdomain = var.landing_domain != "" ? "portal.${var.landing_domain}" : ""
+  mcp_subdomain      = var.landing_domain != "" ? "mcp.${var.landing_domain}" : ""
+  portal_subdomain   = var.landing_domain != "" ? "portal.${var.landing_domain}" : ""
+  langfuse_subdomain = var.landing_domain != "" ? "langfuse.${var.landing_domain}" : ""
 }
 
 resource "google_compute_region_network_endpoint_group" "mcp_readonly" {
@@ -49,5 +50,32 @@ resource "google_compute_backend_service" "portal" {
 
   backend {
     group = google_compute_region_network_endpoint_group.portal[0].id
+  }
+}
+
+# langfuse.<domain> gets a fixed, known-in-advance URL through the same
+# Load Balancer (needed as NEXTAUTH_URL at Langfuse's own boot time —
+# Cloud Run's own generated *.run.app URL isn't known before the service
+# exists, a custom subdomain sidesteps that chicken-and-egg entirely).
+resource "google_compute_region_network_endpoint_group" "langfuse" {
+  count = var.landing_domain != "" ? 1 : 0
+
+  name                  = "${var.service_name}-langfuse-neg"
+  region                = var.region
+  network_endpoint_type = "SERVERLESS"
+
+  cloud_run {
+    service = google_cloud_run_v2_service.langfuse.name
+  }
+}
+
+resource "google_compute_backend_service" "langfuse" {
+  count = var.landing_domain != "" ? 1 : 0
+
+  name                  = "${var.service_name}-langfuse-backend"
+  load_balancing_scheme = "EXTERNAL"
+
+  backend {
+    group = google_compute_region_network_endpoint_group.langfuse[0].id
   }
 }

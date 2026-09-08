@@ -76,3 +76,8 @@ output "portal_domain_url" {
   description = "Portal via domínio próprio (subdomínio), depois de apontar o DNS e o cert ficar ACTIVE — vazio se var.landing_domain não estiver configurado"
   value       = var.landing_domain != "" ? "https://${local.portal_subdomain}" : ""
 }
+
+output "langfuse_domain_url" {
+  description = "Langfuse self-hosted (ADR-045 amendment) via domínio próprio, depois de apontar o DNS e o cert ficar ACTIVE — abra este URL pra criar a 1ª conta admin e gerar o par de API keys antes de preencher LANGFUSE_PUBLIC_KEY/LANGFUSE_SECRET_KEY e virar var.tracer_sink para \"langfuse\"; vazio se var.landing_domain não estiver configurado"
+  value       = var.landing_domain != "" ? "https://${local.langfuse_subdomain}" : ""
+}

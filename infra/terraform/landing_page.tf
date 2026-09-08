@@ -69,6 +69,22 @@ resource "google_compute_url_map" "landing" {
       default_service = google_compute_backend_service.portal[0].id
     }
   }
+
+  dynamic "host_rule" {
+    for_each = var.landing_domain != "" ? [1] : []
+    content {
+      hosts        = [local.langfuse_subdomain]
+      path_matcher = "langfuse"
+    }
+  }
+
+  dynamic "path_matcher" {
+    for_each = var.landing_domain != "" ? [1] : []
+    content {
+      name            = "langfuse"
+      default_service = google_compute_backend_service.langfuse[0].id
+    }
+  }
 }
 
 resource "google_compute_target_http_proxy" "landing" {
@@ -105,10 +121,10 @@ resource "google_compute_managed_ssl_certificate" "landing" {
   # change in lockstep. Confirmed live: without this, `terraform apply`
   # fails destroying the old cert first ("resourceInUseByAnotherResource",
   # since the HTTPS proxy still references it) — the real bug this fixes.
-  name = "${var.service_name}-landing-cert-${substr(sha1(join(",", compact([var.landing_domain, local.mcp_subdomain, local.portal_subdomain]))), 0, 8)}"
+  name = "${var.service_name}-landing-cert-${substr(sha1(join(",", compact([var.landing_domain, local.mcp_subdomain, local.portal_subdomain, local.langfuse_subdomain]))), 0, 8)}"
 
   managed {
-    domains = compact([var.landing_domain, local.mcp_subdomain, local.portal_subdomain])
+    domains = compact([var.landing_domain, local.mcp_subdomain, local.portal_subdomain, local.langfuse_subdomain])
   }
 
   lifecycle {
