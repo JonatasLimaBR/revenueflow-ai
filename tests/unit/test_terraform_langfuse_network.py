@@ -15,6 +15,21 @@ def test_vpc_connector_declared_for_langfuse() -> None:
     assert 'resource "google_vpc_access_connector" "langfuse"' in body
 
 
+def test_vpc_connector_name_fits_the_gcp_25_char_limit() -> None:
+    # Regression: "${var.service_name}-langfuse-vpc" (28 chars with the
+    # default service_name) exceeded GCP's connector ID limit
+    # (^[a-z][-a-z0-9]{0,23}[a-z0-9]$, max 25) and the apply failed with a
+    # 400. "lf" instead of "langfuse" fits (22 chars with the default).
+    body = (_TF / "langfuse_network.tf").read_text()
+    block = body.split('resource "google_vpc_access_connector" "langfuse"', 1)[1].split(
+        "\nresource ", 1
+    )[0]
+    default_service_name = "revenueflow-api"
+    name_expr = block.split('name          = "', 1)[1].split('"', 1)[0]
+    rendered = name_expr.replace("${var.service_name}", default_service_name)
+    assert len(rendered) <= 25, f"connector name '{rendered}' ({len(rendered)} chars) exceeds 25"
+
+
 def test_cloud_sql_instance_gets_a_private_network() -> None:
     # Regression: the first apply used the instance's PUBLIC IP for the
     # Langfuse DSN and failed (`P1001: Can't reach database server`) —

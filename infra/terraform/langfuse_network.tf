@@ -37,8 +37,13 @@ resource "google_service_networking_connection" "private_service_access" {
 # Langfuse alcançar o IP privado do Cloud SQL. egress PRIVATE_RANGES_ONLY
 # (cloud_run.tf/langfuse_service.tf) mantém todo o resto do tráfego (Vertex
 # AI, Gemini, chamadas externas) saindo direto, sem passar pelo connector.
+#
+# Fix pós-merge (2026-09-08): "${var.service_name}-langfuse-vpc" tem 28
+# caracteres -- o connector ID do GCP aceita no máximo 25
+# (^[a-z][-a-z0-9]{0,23}[a-z0-9]$), então o apply falhou com 400. "lf" no
+# lugar de "langfuse" cabe (22 caracteres com o var.service_name default).
 resource "google_vpc_access_connector" "langfuse" {
-  name          = "${var.service_name}-langfuse-vpc"
+  name          = "${var.service_name}-lf-vpc"
   region        = var.region
   network       = data.google_compute_network.default.name
   ip_cidr_range = "10.8.0.0/28"
