@@ -18,6 +18,8 @@ def get_pool() -> AsyncConnectionPool[AsyncConnection[Any]]:
         _pool = AsyncConnectionPool(
             settings.database_url,
             open=False,
+            min_size=2,
+            max_size=10,
             kwargs={"options": f"-c statement_timeout={settings.db_statement_timeout_ms}"},
         )
     return _pool

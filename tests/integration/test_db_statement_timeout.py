@@ -31,3 +31,16 @@ async def test_long_query_is_cancelled(pool_with_timeout: int) -> None:
     with pytest.raises(psycopg.errors.QueryCanceled):
         async with get_pool().connection() as conn:
             await conn.execute("SELECT pg_sleep(1)")
+
+
+async def test_pool_is_sized_beyond_the_psycopg_default(db: None) -> None:
+    """Regression: psycopg_pool defaults to a fixed pool of 4 connections
+    (min_size=4, max_size=None -> 4) when unconfigured. That was too small
+    for one turn's several sequential DB round-trips plus the LangGraph
+    checkpointer's own pool plus routine /internal/* polling — found live
+    as "error connecting in 'pool-1': connection timeout expired" during a
+    real WhatsApp turn."""
+
+    pool = get_pool()
+    assert pool.min_size >= 2
+    assert pool.max_size >= 10
