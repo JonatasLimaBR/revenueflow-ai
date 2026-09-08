@@ -16,5 +16,77 @@
     "product_id": "PMP-050-PER",
     "last_qty": 25,
     "last_order_at": "2026-02-19T16:45:00Z"
+  },
+  {
+    "customer_id": "CUST-004",
+    "product_id": "PMP-150-PER",
+    "last_qty": 6,
+    "last_order_at": "2026-06-10T10:00:00Z"
+  },
+  {
+    "customer_id": "CUST-004",
+    "product_id": "ACC-CAP-250",
+    "last_qty": 20,
+    "last_order_at": "2026-07-01T15:30:00Z"
+  },
+  {
+    "customer_id": "CUST-005",
+    "product_id": "MTB-550-GAS",
+    "last_qty": 3,
+    "last_order_at": "2026-08-01T09:00:00Z"
+  },
+  {
+    "customer_id": "CUST-005",
+    "product_id": "PMP-300-CEN",
+    "last_qty": 2,
+    "last_order_at": "2026-06-15T11:00:00Z"
+  },
+  {
+    "customer_id": "CUST-006",
+    "product_id": "PMP-075-SUB",
+    "last_qty": 5,
+    "last_order_at": "2026-07-20T14:00:00Z"
+  },
+  {
+    "customer_id": "CUST-008",
+    "product_id": "PMP-100-SUB",
+    "last_qty": 4,
+    "last_order_at": "2026-08-05T10:30:00Z"
+  },
+  {
+    "customer_id": "CUST-009",
+    "product_id": "PMP-500-CEN",
+    "last_qty": 2,
+    "last_order_at": "2026-06-28T08:45:00Z"
+  },
+  {
+    "customer_id": "CUST-009",
+    "product_id": "MTB-900-DIE",
+    "last_qty": 1,
+    "last_order_at": "2026-07-18T13:00:00Z"
+  },
+  {
+    "customer_id": "CUST-011",
+    "product_id": "PMP-100-PRE",
+    "last_qty": 3,
+    "last_order_at": "2026-07-25T09:15:00Z"
+  },
+  {
+    "customer_id": "CUST-012",
+    "product_id": "PMP-200-PRE",
+    "last_qty": 6,
+    "last_order_at": "2026-08-12T10:00:00Z"
+  },
+  {
+    "customer_id": "CUST-012",
+    "product_id": "KIT-100-RES",
+    "last_qty": 8,
+    "last_order_at": "2026-08-20T14:20:00Z"
+  },
+  {
+    "customer_id": "CUST-015",
+    "product_id": "PMP-050-PRE",
+    "last_qty": 5,
+    "last_order_at": "2026-08-15T11:40:00Z"
   }
 ]

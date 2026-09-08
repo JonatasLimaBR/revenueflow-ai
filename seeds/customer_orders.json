@@ -2,29 +2,181 @@
   {
     "customer_id": "CUST-001",
     "order_id": "SO-HIST-001A",
-    "total": 6799.00,
+    "total": 6799.0,
     "ordered_at": "2026-07-01T10:00:00Z",
-    "items": [{"product_id": "PMP-100-CEN", "quantity": 10}]
+    "items": [
+      {
+        "product_id": "PMP-100-CEN",
+        "quantity": 10
+      }
+    ]
   },
   {
     "customer_id": "CUST-001",
     "order_id": "SO-HIST-001B",
-    "total": 3599.00,
+    "total": 3599.0,
     "ordered_at": "2026-04-15T10:00:00Z",
-    "items": [{"product_id": "PMP-050-PER", "quantity": 10}]
+    "items": [
+      {
+        "product_id": "PMP-050-PER",
+        "quantity": 10
+      }
+    ]
   },
   {
     "customer_id": "CUST-001",
     "order_id": "SO-HIST-001C",
-    "total": 12000.00,
+    "total": 12000.0,
     "ordered_at": "2025-06-20T10:00:00Z",
-    "items": [{"product_id": "PMP-100-PER", "quantity": 20}]
+    "items": [
+      {
+        "product_id": "PMP-100-PER",
+        "quantity": 20
+      }
+    ]
   },
   {
     "customer_id": "CUST-002",
     "order_id": "SO-HIST-002A",
-    "total": 1500.00,
+    "total": 1500.0,
     "ordered_at": "2026-07-20T10:00:00Z",
-    "items": [{"product_id": "PMP-050-PER", "quantity": 4}]
+    "items": [
+      {
+        "product_id": "PMP-050-PER",
+        "quantity": 4
+      }
+    ]
+  },
+  {
+    "customer_id": "CUST-004",
+    "order_id": "SO-HIST-004A",
+    "total": 3719.4,
+    "ordered_at": "2026-06-10T10:00:00Z",
+    "items": [
+      {
+        "product_id": "PMP-150-PER",
+        "quantity": 6
+      }
+    ]
+  },
+  {
+    "customer_id": "CUST-005",
+    "order_id": "SO-HIST-005A",
+    "total": 5099.7,
+    "ordered_at": "2026-08-01T09:00:00Z",
+    "items": [
+      {
+        "product_id": "MTB-550-GAS",
+        "quantity": 3
+      }
+    ]
+  },
+  {
+    "customer_id": "CUST-005",
+    "order_id": "SO-HIST-005B",
+    "total": 3199.8,
+    "ordered_at": "2026-06-15T11:00:00Z",
+    "items": [
+      {
+        "product_id": "PMP-300-CEN",
+        "quantity": 2
+      }
+    ]
+  },
+  {
+    "customer_id": "CUST-006",
+    "order_id": "SO-HIST-006A",
+    "total": 4249.5,
+    "ordered_at": "2026-07-20T14:00:00Z",
+    "items": [
+      {
+        "product_id": "PMP-075-SUB",
+        "quantity": 5
+      }
+    ]
+  },
+  {
+    "customer_id": "CUST-008",
+    "order_id": "SO-HIST-008A",
+    "total": 4719.6,
+    "ordered_at": "2026-08-05T10:30:00Z",
+    "items": [
+      {
+        "product_id": "PMP-100-SUB",
+        "quantity": 4
+      }
+    ]
+  },
+  {
+    "customer_id": "CUST-009",
+    "order_id": "SO-HIST-009A",
+    "total": 5499.8,
+    "ordered_at": "2026-06-28T08:45:00Z",
+    "items": [
+      {
+        "product_id": "PMP-500-CEN",
+        "quantity": 2
+      }
+    ]
+  },
+  {
+    "customer_id": "CUST-009",
+    "order_id": "SO-HIST-009B",
+    "total": 4899.9,
+    "ordered_at": "2026-07-18T13:00:00Z",
+    "items": [
+      {
+        "product_id": "MTB-900-DIE",
+        "quantity": 1
+      }
+    ]
+  },
+  {
+    "customer_id": "CUST-011",
+    "order_id": "SO-HIST-011A",
+    "total": 2549.7,
+    "ordered_at": "2026-07-25T09:15:00Z",
+    "items": [
+      {
+        "product_id": "PMP-100-PRE",
+        "quantity": 3
+      }
+    ]
+  },
+  {
+    "customer_id": "CUST-012",
+    "order_id": "SO-HIST-012A",
+    "total": 8819.4,
+    "ordered_at": "2026-08-12T10:00:00Z",
+    "items": [
+      {
+        "product_id": "PMP-200-PRE",
+        "quantity": 6
+      }
+    ]
+  },
+  {
+    "customer_id": "CUST-012",
+    "order_id": "SO-HIST-012B",
+    "total": 7839.2,
+    "ordered_at": "2026-08-20T14:20:00Z",
+    "items": [
+      {
+        "product_id": "KIT-100-RES",
+        "quantity": 8
+      }
+    ]
+  },
+  {
+    "customer_id": "CUST-015",
+    "order_id": "SO-HIST-015A",
+    "total": 2149.5,
+    "ordered_at": "2026-08-15T11:40:00Z",
+    "items": [
+      {
+        "product_id": "PMP-050-PRE",
+        "quantity": 5
+      }
+    ]
   }
 ]

@@ -17,5 +17,84 @@
     "phone": "5511900000003",
     "name": "Bomba Rapida Servicos",
     "segment": "bronze"
+  },
+  {
+    "customer_id": "CUST-004",
+    "phone": "5511900000004",
+    "name": "Hidraulica Sao Jose Ltda",
+    "segment": "gold",
+    "consent_opt_in_at": "2026-07-15T09:30:00Z"
+  },
+  {
+    "customer_id": "CUST-005",
+    "phone": "5519900000005",
+    "name": "Agropecuaria Bom Retiro",
+    "segment": "gold",
+    "consent_opt_in_at": "2026-08-10T14:00:00Z"
+  },
+  {
+    "customer_id": "CUST-006",
+    "phone": "5519900000006",
+    "name": "Poços Artesianos Campinas ME",
+    "segment": "silver",
+    "consent_opt_in_at": "2026-06-20T11:15:00Z"
+  },
+  {
+    "customer_id": "CUST-007",
+    "phone": "5521900000007",
+    "name": "Construtora Rio Bomba Eireli",
+    "segment": "bronze"
+  },
+  {
+    "customer_id": "CUST-008",
+    "phone": "5521900000008",
+    "name": "Fazenda Santa Clara",
+    "segment": "silver",
+    "consent_opt_in_at": "2026-08-22T16:45:00Z"
+  },
+  {
+    "customer_id": "CUST-009",
+    "phone": "5531900000009",
+    "name": "Mineração Horizonte Ltda",
+    "segment": "gold",
+    "consent_opt_in_at": "2026-07-05T08:00:00Z"
+  },
+  {
+    "customer_id": "CUST-010",
+    "phone": "5531900000010",
+    "name": "Sitio Recanto das Aguas",
+    "segment": "bronze"
+  },
+  {
+    "customer_id": "CUST-011",
+    "phone": "5541900000011",
+    "name": "Piscinas Litoral Sul Ltda",
+    "segment": "silver"
+  },
+  {
+    "customer_id": "CUST-012",
+    "phone": "5541900000012",
+    "name": "Distribuidora Hidro Norte",
+    "segment": "gold",
+    "consent_opt_in_at": "2026-08-28T10:20:00Z"
+  },
+  {
+    "customer_id": "CUST-013",
+    "phone": "5551900000013",
+    "name": "Cooperativa Agricola Serra Alta",
+    "segment": "silver"
+  },
+  {
+    "customer_id": "CUST-014",
+    "phone": "5561900000014",
+    "name": "Manutencao Predial Central",
+    "segment": "bronze"
+  },
+  {
+    "customer_id": "CUST-015",
+    "phone": "5571900000015",
+    "name": "Estancia Aguas Claras",
+    "segment": "gold",
+    "consent_opt_in_at": "2026-08-30T13:10:00Z"
   }
 ]
