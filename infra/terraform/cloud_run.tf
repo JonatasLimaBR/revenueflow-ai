@@ -35,6 +35,22 @@ resource "google_cloud_run_v2_service" "api" {
     containers {
       image = var.image
 
+      # Never set explicitly before — Cloud Run's bare default (512Mi/1 CPU)
+      # was carrying the real workload the whole time: LangGraph, 2 psycopg
+      # pools (app + checkpointer, up to 10 connections each as of PRs
+      # #83/#84 — double what a single unpooled connection used before), the
+      # Vertex AI client's gRPC channels, and — under a Pub/Sub redelivery
+      # storm — multiple concurrent turns in memory at once. Matches the
+      # instance-restart pattern seen live ("Starting new instance" then
+      # "Shutting down" ~10s apart, mid-turn, with no clean ack/nack logged)
+      # — consistent with an OOM kill, not a normal scale-down.
+      resources {
+        limits = {
+          cpu    = "1"
+          memory = "2Gi"
+        }
+      }
+
       # Cloud Run defaults to 8080 and probes that port; the app listens on 8000.
       ports {
         container_port = 8000
