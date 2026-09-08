@@ -82,12 +82,39 @@
   document.querySelectorAll(".node").forEach((el) => { nodes[el.dataset.agent] = el; });
   const log = document.getElementById("log");
   let first = true;
+
+  // Some agents (recommendation, negotiation) now finish well under a
+  // second (post-2026-09-08 latency fixes) — "started" and "finished" can
+  // arrive close enough together that the browser never actually paints
+  // the "active" class before it's removed again, so the glow never shows.
+  // Enforce a minimum visible duration per node instead of toggling
+  // immediately on "finished".
+  const MIN_ACTIVE_MS = 700;
+  const timers = {};
+
+  function activate(agent) {
+    const node = nodes[agent];
+    if (!node) return;
+    node.classList.add("active");
+    if (timers[agent]) clearTimeout(timers[agent]);
+  }
+
+  function scheduleDeactivate(agent) {
+    const node = nodes[agent];
+    if (!node) return;
+    if (timers[agent]) clearTimeout(timers[agent]);
+    timers[agent] = setTimeout(() => node.classList.remove("active"), MIN_ACTIVE_MS);
+  }
+
   const source = new EventSource("/portal/live/stream");
   source.onmessage = (event) => {
     let payload;
     try { payload = JSON.parse(event.data); } catch (e) { return; }
-    const node = nodes[payload.agent];
-    if (node) node.classList.toggle("active", payload.status === "started");
+    if (payload.status === "started") {
+      activate(payload.agent);
+    } else {
+      scheduleDeactivate(payload.agent);
+    }
     if (first) { log.innerHTML = ""; first = false; }
     const row = document.createElement("div");
     row.className = "row";
