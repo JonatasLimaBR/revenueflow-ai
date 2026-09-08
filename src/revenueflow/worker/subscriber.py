@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from typing import Any
 
 from revenueflow.config import get_settings
@@ -41,14 +42,41 @@ async def run_subscriber() -> None:
     loop = asyncio.get_running_loop()
 
     def _handle(message: Any) -> None:
+        # Diagnostic (temporary): pin down where a turn's time actually goes.
+        # publish_time -> _handle is Pub/Sub delivery + client dispatch;
+        # _handle -> scheduled is asyncio.run_coroutine_threadsafe queueing on
+        # the event loop; the rest is process_event() itself (already partly
+        # visible via the AFC/turn-budget logs). Multi-minute turns kept
+        # recurring after 4 separate fixes (EventPublisher, Vertex client
+        # cache, app DB pool, checkpointer pool) that all targeted
+        # process_event()'s internals — this narrows down whether the delay
+        # is actually upstream of it instead.
         try:
+            received_at = time.monotonic()
+            publish_time = getattr(message, "publish_time", None)
+            _LOGGER.info(
+                "pubsub message dispatched: message_id=%s publish_time=%s delivery_delay_s=%s",
+                getattr(message, "message_id", None),
+                publish_time,
+                (received_at - publish_time.timestamp()) if publish_time else None,
+            )
             envelope = from_json(message.data)
             handler = _ROUTES.get(envelope.event_type)
             if handler is None:
                 _LOGGER.warning("unknown event_type %s; acking", envelope.event_type)
                 message.ack()
                 return
+            scheduled_at = time.monotonic()
+            _LOGGER.info(
+                "scheduling handler on event loop: dispatch_to_schedule_s=%.3f",
+                scheduled_at - received_at,
+            )
             asyncio.run_coroutine_threadsafe(handler(envelope), loop).result()
+            _LOGGER.info(
+                "handler finished: message_id=%s total_s=%.3f",
+                getattr(message, "message_id", None),
+                time.monotonic() - received_at,
+            )
         except Exception:
             _LOGGER.exception("consumer failed; nacking message")
             message.nack()
