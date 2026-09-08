@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from datetime import UTC, datetime
 from typing import Any
 
@@ -107,14 +108,33 @@ async def process_event(
     processed. Re-raises any unexpected error after ending the trace.
     """
 
+    # Diagnostic (temporary, see subscriber.py): a duplicate delivery of the
+    # same message (redelivered after the app pool/checkpointer-pool fixes,
+    # PRs #83/#84) still took 450s end to end with only ONE of the two
+    # concurrent attempts ever reaching an LLM call — meaning the OTHER one
+    # was stuck somewhere in claim()/get_or_create()/aget_state()/resolve(),
+    # all DB-bound, before the graph even starts. This pins down which one.
+    _t0 = time.monotonic()
     async with unit_of_work() as conn:
         claimed = await processed_event.claim(conn, kind="turn", key=envelope.event_id)
+    _LOGGER.info(
+        "claim done: event_id=%s claimed=%s claim_s=%.3f",
+        envelope.event_id,
+        claimed,
+        time.monotonic() - _t0,
+    )
     if not claimed:
         return False
 
     phone = str(envelope.payload["phone"])
     text = str(envelope.payload["message_text"])
+    _t1 = time.monotonic()
     session = await get_or_create(phone)
+    _LOGGER.info(
+        "session resolved: event_id=%s get_or_create_s=%.3f",
+        envelope.event_id,
+        time.monotonic() - _t1,
+    )
     if session.status == SessionStatus.HUMAN_HANDOFF:
         await _send_once(
             session.conversation_id, envelope.event_id, phone, _HELD_FOR_HANDOFF, outbound
@@ -125,7 +145,13 @@ async def process_event(
     )
     config = {"configurable": {"thread_id": session.conversation_id}}
     try:
+        _t2 = time.monotonic()
         snapshot = await get_graph().aget_state(config)
+        _LOGGER.info(
+            "checkpointer state read: event_id=%s aget_state_s=%.3f",
+            envelope.event_id,
+            time.monotonic() - _t2,
+        )
         if "await_approval" in (snapshot.next or ()):
             await _send_once(
                 session.conversation_id, envelope.event_id, phone, _HELD_FOR_APPROVAL, outbound
@@ -133,7 +159,13 @@ async def process_event(
             get_tracer().end(outcome="held_for_approval")
             return True
 
+        _t3 = time.monotonic()
         customer_id, lead_id = await resolve(phone)
+        _LOGGER.info(
+            "identity resolved: event_id=%s resolve_s=%.3f",
+            envelope.event_id,
+            time.monotonic() - _t3,
+        )
         if customer_id is not None:
             async with unit_of_work() as conn:
                 await session_repo.set_customer(conn, session.conversation_id, customer_id)
