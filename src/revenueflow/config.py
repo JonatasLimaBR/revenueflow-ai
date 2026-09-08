@@ -46,7 +46,11 @@ class Settings(BaseSettings):
 
     llm_call_timeout_s: float = 6.0
     db_statement_timeout_ms: int = 3000
-    turn_budget_s: float = 15.0
+    # 15s wasn't enough headroom for 2 sequential real Gemini calls
+    # (classify_intent + recommendation) plus DB overhead in practice — a
+    # turn that hit no bug and no retry still took ~30s live, tripping the
+    # _SLOW_REPLY fallback instead of returning the real answer.
+    turn_budget_s: float = 25.0
 
     log_level: str = "INFO"
     otel_service_name: str = "revenueflow-api"
