@@ -33,6 +33,13 @@ locals {
     # round of this same fix, ADR-069): google_bigquery_dataset.analytics
     # (ADR-061) needs bigquery.datasets.create too.
     "roles/bigquery.admin",
+    # Found live (2026-09-08, ADR-075 correção pós-merge): the Langfuse
+    # network fix (google_service_networking_connection +
+    # google_vpc_access_connector, langfuse_network.tf) failed with 403 on
+    # both resources — roles/compute.admin does NOT cover the separate
+    # Service Networking / VPC Access APIs' own permissions.
+    "roles/servicenetworking.networksAdmin", # servicenetworking.services.addPeering
+    "roles/vpcaccess.admin",                 # vpcaccess.connectors.create
   ])
 }
 
