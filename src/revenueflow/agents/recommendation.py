@@ -50,11 +50,32 @@ async def _search(text: str) -> list[dict[str, Any]]:
     return []
 
 
+def _has_established_product(state: TurnState) -> bool:
+    """Whether a prior turn already grounded this conversation in a product."""
+
+    for entry in state.get("tool_results", []):
+        if entry.get("tool") == "search_products" and entry.get("result"):
+            return True
+    return False
+
+
 async def recommendation_node(state: TurnState) -> dict[str, Any]:
     """Run the fixed read-only tool sequence and collect grounded results."""
 
     with get_tracer().span("node.recommendation"):
         products = await _search(state["customer_text"])
+        if not products and _has_established_product(state):
+            # This turn's raw text doesn't name a product — a plain
+            # negotiation follow-up like "pode fazer por 700?" never repeats
+            # what's being negotiated. Returning {} leaves the checkpointed
+            # tool_results from the turn that DID find a product untouched
+            # (LangGraph only overwrites keys a node actually returns).
+            # Found live: every turn re-ran this naive keyword search from
+            # scratch, silently dropping the negotiation's subject and
+            # sending the customer back to "Sobre qual produto...?" — twice
+            # in the same conversation, even after the customer re-pasted
+            # the full product name once already.
+            return {}
         tool_results: list[dict[str, Any]] = [{"tool": "search_products", "result": products}]
         if products:
             inventory = await get_inventory(str(products[0]["product_id"]), 1)

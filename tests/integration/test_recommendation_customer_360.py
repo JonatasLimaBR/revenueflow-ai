@@ -53,3 +53,30 @@ async def test_node_degrades_when_360_raises(db: None, monkeypatch: pytest.Monke
 
     entry = _entry(result, "get_customer_360")
     assert entry == {"tool": "get_customer_360", "error": "unavailable"}
+
+
+async def test_node_preserves_established_product_on_a_wordless_followup(db: None) -> None:
+    """Regression: a pure negotiation follow-up ("pode fazer por 700?") never
+    repeats the product name, so the naive keyword search finds nothing.
+    Found live: recommendation_node always overwrote tool_results anyway,
+    wiping the product a prior turn had already established and sending
+    negotiation_node back to "Sobre qual produto...?" mid-negotiation."""
+
+    state = _state("CUST-001")
+    state["customer_text"] = "pode fazer por 700,00"
+    state["tool_results"] = [
+        {"tool": "search_products", "result": [{"product_id": "PMP-150-CEN"}]},
+    ]
+
+    result = await recommendation_node(state)
+
+    assert result == {}
+
+
+async def test_node_returns_empty_search_with_no_prior_product_to_preserve(db: None) -> None:
+    state = _state("CUST-001")
+    state["customer_text"] = "pode fazer por 700,00"
+
+    result = await recommendation_node(state)
+
+    assert _entry(result, "search_products") == {"tool": "search_products", "result": []}
