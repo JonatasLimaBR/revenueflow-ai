@@ -36,6 +36,13 @@ resource "google_cloud_run_v2_service" "langfuse" {
       max_instance_count = 2
     }
 
+    # Only private-range traffic (the Cloud SQL private IP) goes through the
+    # connector — Vertex AI/Gemini and anything else still egresses direct.
+    vpc_access {
+      connector = google_vpc_access_connector.langfuse.id
+      egress    = "PRIVATE_RANGES_ONLY"
+    }
+
     containers {
       image = "langfuse/langfuse:2"
 

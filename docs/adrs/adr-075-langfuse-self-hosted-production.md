@@ -57,12 +57,11 @@ escolheu self-hosted completo (controle total) em vez de Langfuse Cloud SaaS.
 
 - **Langfuse Cloud (SaaS)** — rejeitada: usuário pediu explicitamente controle total, sem dado de
   produção saindo do próprio GCP.
-- **VPC connector + IP privado do Cloud SQL** — mais "correto" de rede, mas exige provisionar um
-  Serverless VPC Access connector novo só pra isso; o IP público + SSL já é o padrão que a própria
-  instância expõe hoje (usado pra migração/dev local), sem superfície nova.
 - **URL `*.run.app` do próprio Cloud Run pro `NEXTAUTH_URL`** — inviável sem um passo manual de
   atualização pós-criação (a URL só existe depois do 1º apply); o subdomínio fixo evita esse
   problema de raiz.
+- **IP público do Cloud SQL pro DSN do Langfuse** — decisão original desta ADR, revertida na
+  Correção pós-merge abaixo depois de quebrar em produção.
 
 ## Motivo
 Fecha a lacuna que a auditoria do ADR-069/070 encontrou (produção nunca rodou `otel` nem
@@ -84,6 +83,38 @@ componentes novos.
   `revenueflow-langfuse-public-key`/`revenueflow-langfuse-secret-key`; trocar `var.tracer_sink` pra
   `"langfuse"` e (opcional) `var.langfuse_disable_signup` pra `true`.
 - Sem dependência nova, sem build de imagem próprio (imagem pública `langfuse/langfuse:2` direto).
+
+## Correção pós-merge (2026-09-08)
+
+O 1º `apply` real falhou: `google_cloud_run_v2_service.langfuse` nunca ficou saudável —
+`Default STARTUP TCP probe failed`, e os logs mostraram a causa raiz: `Prisma Error P1001: Can't
+reach database server at 35.247.244.160:5432` (o IP público da instância `oltp`). A suposição
+original desta ADR estava errada: `ipv4_enabled = true` **sem** `authorized_networks` não abre a
+instância pra qualquer IP — é o oposto, o Cloud SQL bloqueia por padrão toda conexão externa até a
+rede de origem ser explicitamente autorizada. A API principal (`revenueflow-api`) não foi afetada
+(recurso independente no grafo do Terraform, confirmado saudável via `gcloud run services
+describe`).
+
+Duas correções possíveis: abrir `authorized_networks` pra `0.0.0.0/0` (mais simples, mas expõe a
+autenticação do banco à internet inteira — rejeitada, regressão de segurança clara contra o
+ADR-031), ou a abordagem recomendada pelo próprio GCP pra Cloud Run → Cloud SQL: um **Serverless
+VPC Access connector + IP privado na instância**, escolhida aqui.
+
+- **Novo arquivo `langfuse_network.tf`**: `google_compute_global_address` (Private Service Access,
+  range `/20`) + `google_service_networking_connection` (peering) na rede `default` do projeto
+  (nenhuma VPC customizada existia — reaproveitada em vez de criar uma nova) +
+  `google_vpc_access_connector` (`10.8.0.0/28`).
+- **`cloud_sql.tf`**: `ip_configuration.private_network` adicionado na instância `oltp` já
+  existente (`depends_on` do peering acima) — mantém `ipv4_enabled = true` (o IP público continua
+  existindo, só não é mais usado pelo Langfuse), não força recriação da instância.
+- **`secrets.tf`**: o DSN do Langfuse troca de `public_ip_address` pra `private_ip_address`.
+- **`langfuse_service.tf`**: bloco `vpc_access` no `template`, `egress = "PRIVATE_RANGES_ONLY"` —
+  só o tráfego pra IPs privados (o Cloud SQL) passa pelo connector; Vertex AI/Gemini e qualquer
+  outra chamada externa continuam saindo direto.
+- **`apis.tf`** += `servicenetworking.googleapis.com`/`vpcaccess.googleapis.com`.
+- Suite nova `tests/unit/test_terraform_langfuse_network.py` (7 testes), incluindo uma trava
+  explícita: `authorized_networks` e `0.0.0.0/0` nunca podem aparecer em `cloud_sql.tf` — se a
+  correção errada (abrir pra internet) for tentada de novo, o teste falha.
 
 ## Regra de revisão
 Mudanças nesta decisão — em especial migrar pra uma instância Cloud SQL dedicada, remover o

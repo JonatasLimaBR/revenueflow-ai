@@ -121,8 +121,13 @@ resource "google_secret_manager_secret_version" "portal_session_secret" {
 
 # Langfuse's own Postgres DSN (its Prisma/Node client, unlike the app's
 # psycopg pools, doesn't speak the /cloudsql unix-socket DSN convention — a
-# plain host:port DSN against the instance's existing public IP, same
-# ssl_mode=ENCRYPTED_ONLY the instance already enforces).
+# plain host:port DSN, same ssl_mode=ENCRYPTED_ONLY the instance already
+# enforces). Fix pós-merge (2026-09-08): the first deploy used the
+# instance's PUBLIC IP and failed (`P1001: Can't reach database server`) —
+# ipv4_enabled=true without authorized_networks blocks every external IP by
+# default, it does not open the instance up. The private IP (reachable only
+# via the VPC connector, langfuse_network.tf/langfuse_service.tf) is the
+# fix, not opening authorized_networks to the internet.
 resource "google_secret_manager_secret" "langfuse_db_url" {
   secret_id = "revenueflow-langfuse-database-url"
 
@@ -135,7 +140,7 @@ resource "google_secret_manager_secret" "langfuse_db_url" {
 
 resource "google_secret_manager_secret_version" "langfuse_db_url" {
   secret      = google_secret_manager_secret.langfuse_db_url.id
-  secret_data = "postgresql://${google_sql_user.langfuse.name}:${random_password.langfuse_db.result}@${google_sql_database_instance.oltp.public_ip_address}:5432/${google_sql_database.langfuse.name}?sslmode=require"
+  secret_data = "postgresql://${google_sql_user.langfuse.name}:${random_password.langfuse_db.result}@${google_sql_database_instance.oltp.private_ip_address}:5432/${google_sql_database.langfuse.name}?sslmode=require"
 }
 
 # Langfuse's NextAuth cookie-signing secret and password-hashing salt —
