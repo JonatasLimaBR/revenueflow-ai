@@ -31,14 +31,14 @@ def test_http_proxy_redirects_to_https_when_domain_set() -> None:
 
 
 def test_managed_cert_covers_root_domain_and_subdomains() -> None:
-    # Extended (SUBDOMAINS) to also cover mcp./portal. — still just the
-    # domains this deploy actually configures, via compact(), never a
-    # hardcoded or unrelated domain.
+    # Extended (SUBDOMAINS, then Langfuse) to also cover mcp./portal./langfuse.
+    # — still just the domains this deploy actually configures, via
+    # compact(), never a hardcoded or unrelated domain.
     body = (_TF / "landing_page.tf").read_text()
     block = body.split('resource "google_compute_managed_ssl_certificate" "landing"', 1)[1]
     assert (
-        "domains = compact([var.landing_domain, local.mcp_subdomain, local.portal_subdomain])"
-        in block
+        "domains = compact([var.landing_domain, local.mcp_subdomain, "
+        "local.portal_subdomain, local.langfuse_subdomain])" in block
     )
 
 

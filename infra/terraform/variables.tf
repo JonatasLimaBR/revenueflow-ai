@@ -63,8 +63,14 @@ variable "vertex_location" {
 
 variable "langfuse_host" {
   type        = string
-  description = "Langfuse base URL; empty until Langfuse is hosted (ADR-045)"
-  default     = ""
+  description = "Langfuse base URL the app points at once var.tracer_sink = \"langfuse\" (ADR-045) — matches the langfuse_service.tf subdomain by default; only override for a different landing_domain"
+  default     = "https://langfuse.mastavista.com.br"
+}
+
+variable "langfuse_disable_signup" {
+  type        = bool
+  description = "Locks down Langfuse's self-service signup once the first admin account exists; false (open signup) until then"
+  default     = false
 }
 
 variable "billing_account" {

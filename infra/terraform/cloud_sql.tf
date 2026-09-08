@@ -44,3 +44,23 @@ resource "google_sql_user" "app" {
   instance = google_sql_database_instance.oltp.name
   password = random_password.db.result
 }
+
+# Langfuse (self-hosted, ADR-045/056 amendment) gets its own database + user
+# on the same instance rather than a second Cloud SQL instance — same
+# reuse-the-instance pattern as the app's own database, keeps V1 cost down.
+resource "google_sql_database" "langfuse" {
+  name     = "langfuse"
+  instance = google_sql_database_instance.oltp.name
+}
+
+resource "random_password" "langfuse_db" {
+  length           = 32
+  special          = true
+  override_special = "_-"
+}
+
+resource "google_sql_user" "langfuse" {
+  name     = "langfuse"
+  instance = google_sql_database_instance.oltp.name
+  password = random_password.langfuse_db.result
+}
