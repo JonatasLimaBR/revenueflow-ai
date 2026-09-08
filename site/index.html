@@ -18,6 +18,7 @@
     <ul class="topnav__links">
       <li><a href="#produto">Produto</a></li>
       <li><a href="#fases">Como funciona</a></li>
+      <li><a href="#simular">Testar agora</a></li>
       <li><a href="#arquitetura">Arquitetura</a></li>
       <li><a href="#roadmap">Roadmap</a></li>
     </ul>
@@ -198,6 +199,97 @@
           </div>
         </article>
 
+      </div>
+    </div>
+  </section>
+
+  <section id="simular" aria-labelledby="simular-title">
+    <div class="container">
+      <div class="section__head">
+        <span class="eyebrow">Sem formulário, sem cadastro</span>
+        <h2 id="simular-title">Simule uma negociação completa — agora, no seu WhatsApp</h2>
+        <p>
+          Cada botão abaixo abre o WhatsApp com uma pergunta diferente já escrita. Envie do jeito
+          que está e o mesmo agente que está em produção responde de verdade — preço, estoque e
+          desconto vêm do catálogo real logo abaixo, não de um roteiro decorado.
+        </p>
+      </div>
+
+      <ol class="how-it-works">
+        <li><span>1</span>Escolha um cenário abaixo (ou escreva o seu, com base no catálogo)</li>
+        <li><span>2</span>O WhatsApp abre com a mensagem pronta — é só enviar</li>
+        <li><span>3</span>O agente responde puxando preço/estoque reais e negocia dentro da alçada</li>
+      </ol>
+
+      <div class="scenario-grid">
+        <article class="scenario">
+          <span class="scenario__tag">Consultar preço</span>
+          <p class="scenario__msg">&ldquo;Quanto custa a Bomba d'água centrífuga 1CV 220V?&rdquo;</p>
+          <a class="btn btn--whatsapp btn--sm" href="https://wa.me/15552027113?text=Quanto%20custa%20a%20Bomba%20d%27%C3%A1gua%20centr%C3%ADfuga%201CV%20220V%3F" target="_blank" rel="noopener">Enviar esta pergunta</a>
+        </article>
+        <article class="scenario">
+          <span class="scenario__tag">Checar estoque</span>
+          <p class="scenario__msg">&ldquo;Vocês têm em estoque a Bomba d'água pressurizadora 3CV trifásica?&rdquo;</p>
+          <a class="btn btn--whatsapp btn--sm" href="https://wa.me/15552027113?text=Voc%C3%AAs%20t%C3%AAm%20em%20estoque%20a%20Bomba%20d%27%C3%A1gua%20pressurizadora%203CV%20trif%C3%A1sica%3F" target="_blank" rel="noopener">Enviar esta pergunta</a>
+        </article>
+        <article class="scenario">
+          <span class="scenario__tag">Negociar desconto</span>
+          <p class="scenario__msg">&ldquo;Preciso de 20 Bombas d'água periféricas 1CV, tem desconto pra esse volume?&rdquo;</p>
+          <a class="btn btn--whatsapp btn--sm" href="https://wa.me/15552027113?text=Preciso%20de%2020%20Bombas%20d%27%C3%A1gua%20perif%C3%A9ricas%201CV%2C%20tem%20desconto%20pra%20esse%20volume%3F" target="_blank" rel="noopener">Enviar esta pergunta</a>
+        </article>
+        <article class="scenario">
+          <span class="scenario__tag">Fechar pedido</span>
+          <p class="scenario__msg">&ldquo;Quero fechar o pedido de 5 Bombas d'água centrífuga 1CV 220V&rdquo;</p>
+          <a class="btn btn--whatsapp btn--sm" href="https://wa.me/15552027113?text=Quero%20fechar%20o%20pedido%20de%205%20Bombas%20d%27%C3%A1gua%20centr%C3%ADfuga%201CV%20220V" target="_blank" rel="noopener">Enviar esta pergunta</a>
+        </article>
+        <article class="scenario">
+          <span class="scenario__tag">Falar com atendente</span>
+          <p class="scenario__msg">&ldquo;Preciso falar com um atendente humano&rdquo;</p>
+          <a class="btn btn--whatsapp btn--sm" href="https://wa.me/15552027113?text=Preciso%20falar%20com%20um%20atendente%20humano" target="_blank" rel="noopener">Enviar esta pergunta</a>
+        </article>
+      </div>
+
+      <p class="scenario-note">
+        Número de teste do Meta (WhatsApp Cloud API) — a mesma porta de entrada que qualquer
+        cliente real usaria. Sem coleta de dado nesta página: o clique só abre o app do WhatsApp.
+      </p>
+
+      <div class="catalog">
+        <h3>Catálogo simulado — 24 produtos, preço à vista (unidade)</h3>
+        <div class="catalog__scroll">
+          <table class="catalog__table">
+            <thead>
+              <tr><th>Categoria</th><th>Produto</th><th>A partir de</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Periférica</td><td>Bomba d'água periférica 1/3CV 127V</td><td>R$ 299,90</td></tr>
+              <tr><td>Periférica</td><td>Bomba d'água periférica 1/2CV 127V</td><td>R$ 389,90</td></tr>
+              <tr><td>Periférica</td><td>Bomba d'água periférica 3/4CV 127/220V</td><td>R$ 469,90</td></tr>
+              <tr><td>Periférica</td><td>Bomba d'água periférica 1CV 127/220V</td><td>R$ 549,90</td></tr>
+              <tr><td>Periférica</td><td>Bomba d'água periférica 1.5CV 220V</td><td>R$ 689,90</td></tr>
+              <tr><td>Centrífuga</td><td>Bomba d'água centrífuga 1CV 220V</td><td>R$ 729,90</td></tr>
+              <tr><td>Centrífuga</td><td>Bomba d'água centrífuga 1.5CV 220V</td><td>R$ 949,90</td></tr>
+              <tr><td>Centrífuga</td><td>Bomba d'água centrífuga 2CV 220V</td><td>R$ 1.189,90</td></tr>
+              <tr><td>Centrífuga</td><td>Bomba d'água centrífuga 3CV 220V trifásica</td><td>R$ 1.699,90</td></tr>
+              <tr><td>Centrífuga</td><td>Bomba d'água centrífuga 5CV 220/380V trifásica</td><td>R$ 2.899,90</td></tr>
+              <tr><td>Submersa</td><td>Bomba d'água submersa 1/2CV 220V para poço</td><td>R$ 649,90</td></tr>
+              <tr><td>Submersa</td><td>Bomba d'água submersa 3/4CV 220V para poço</td><td>R$ 899,90</td></tr>
+              <tr><td>Submersa</td><td>Bomba d'água submersa 1CV 220V para poço profundo</td><td>R$ 1.249,90</td></tr>
+              <tr><td>Submersa</td><td>Bomba d'água submersa 1.5CV trifásica para poço profundo</td><td>R$ 1.899,90</td></tr>
+              <tr><td>Pressurizadora</td><td>Bomba d'água pressurizadora 1/2CV 127V residencial</td><td>R$ 459,90</td></tr>
+              <tr><td>Pressurizadora</td><td>Bomba d'água pressurizadora 1CV 220V residencial/comercial</td><td>R$ 899,90</td></tr>
+              <tr><td>Pressurizadora</td><td>Bomba d'água pressurizadora 2CV 220V comercial</td><td>R$ 1.549,90</td></tr>
+              <tr><td>Pressurizadora</td><td>Bomba d'água pressurizadora 3CV 220V trifásica</td><td>R$ 2.149,90</td></tr>
+              <tr><td>Motobomba</td><td>Motobomba a gasolina 5.5HP autoescorvante 2&Prime;</td><td>R$ 1.789,90</td></tr>
+              <tr><td>Motobomba</td><td>Motobomba a diesel 9HP alta vazão 3&Prime;</td><td>R$ 4.899,90</td></tr>
+              <tr><td>Kit</td><td>Kit pressurizador residencial 1CV com pressostato</td><td>R$ 1.099,90</td></tr>
+              <tr><td>Acessório</td><td>Capacitor de partida 250uF</td><td>R$ 39,90</td></tr>
+              <tr><td>Acessório</td><td>Chave bóia elétrica para caixa d'água</td><td>R$ 59,90</td></tr>
+              <tr><td>Acessório</td><td>Mangueira de sucção reforçada 25m x 1&Prime;</td><td>R$ 219,90</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="catalog__note">Preço unitário (1 un.); pedidos maiores entram em faixa de desconto por volume, negociada pelo próprio agente dentro da alçada permitida.</p>
       </div>
     </div>
   </section>
