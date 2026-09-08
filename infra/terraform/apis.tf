@@ -17,6 +17,8 @@ locals {
     "monitoring.googleapis.com",
     "storage.googleapis.com",
     "bigquery.googleapis.com",
+    "servicenetworking.googleapis.com",
+    "vpcaccess.googleapis.com",
   ])
 }
 

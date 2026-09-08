@@ -69,10 +69,12 @@ def test_langfuse_secrets_declared_and_iam_granted() -> None:
 
 def test_langfuse_db_url_is_a_plain_tcp_dsn_not_a_unix_socket() -> None:
     # Langfuse's Prisma/Node client doesn't speak the /cloudsql unix-socket
-    # DSN convention the app's own psycopg pools use.
+    # DSN convention the app's own psycopg pools use. Private IP, not
+    # public — see test_terraform_langfuse_network.py for the regression
+    # this was found and fixed for (P1001, public IP unreachable by default).
     body = (_TF / "secrets.tf").read_text()
     block = body.split('resource "google_secret_manager_secret_version" "langfuse_db_url"', 1)[1]
-    assert "google_sql_database_instance.oltp.public_ip_address" in block
+    assert "google_sql_database_instance.oltp.private_ip_address" in block
     assert "sslmode=require" in block
     assert "/cloudsql/" not in block
 

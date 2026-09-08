@@ -16,8 +16,9 @@ resource "google_sql_database_instance" "oltp" {
     }
 
     ip_configuration {
-      ipv4_enabled = true
-      ssl_mode     = "ENCRYPTED_ONLY"
+      ipv4_enabled    = true
+      ssl_mode        = "ENCRYPTED_ONLY"
+      private_network = data.google_compute_network.default.id
     }
 
     deletion_protection_enabled = true
@@ -25,7 +26,12 @@ resource "google_sql_database_instance" "oltp" {
 
   deletion_protection = true
 
-  depends_on = [google_project_service.this]
+  # private_network needs the VPC peering (langfuse_network.tf) to exist
+  # first, or the instance update is rejected.
+  depends_on = [
+    google_project_service.this,
+    google_service_networking_connection.private_service_access,
+  ]
 }
 
 resource "google_sql_database" "app" {

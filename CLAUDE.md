@@ -257,8 +257,12 @@ Fatias entregues, arquivadas em `.claude/sdd/archive/`:
   (`infra/terraform/langfuse_service.tf`), mesma imagem pública `langfuse/langfuse:2` do
   `docker-compose.yml` local — sem build próprio. Banco próprio (`google_sql_database`/
   `google_sql_user` `langfuse`) na MESMA instância Cloud SQL já existente (`cloud_sql.tf`), DSN via
-  IP público + `sslmode=require` (não o socket unix `/cloudsql/...` que os pools `psycopg` da app
-  usam — o cliente Prisma/Node do Langfuse não fala essa convenção). Subdomínio fixo
+  IP privado + `sslmode=require` (não o socket unix `/cloudsql/...` que os pools `psycopg` da app
+  usam — o cliente Prisma/Node do Langfuse não fala essa convenção; **correção pós-merge**: o 1º
+  `apply` real usou o IP PÚBLICO da instância e quebrou — `ipv4_enabled=true` sem
+  `authorized_networks` bloqueia por padrão qualquer IP externo, não abre a instância; corrigido com
+  Serverless VPC Access connector + IP privado, `infra/terraform/langfuse_network.tf`, em vez de
+  abrir `authorized_networks` pra `0.0.0.0/0` — que seria uma regressão de segurança real). Subdomínio fixo
   `langfuse.mastavista.com.br` (mesmo padrão Serverless NEG + backend service do ADR-074) em vez da
   URL `*.run.app` do Cloud Run — resolve de saída o ovo-e-galinha do `NEXTAUTH_URL` (precisa ser
   conhecido antes do 1º boot; a URL do Cloud Run só existe depois do serviço criado). Certificado
