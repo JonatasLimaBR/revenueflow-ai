@@ -30,6 +30,17 @@ def test_vpc_connector_name_fits_the_gcp_25_char_limit() -> None:
     assert len(rendered) <= 25, f"connector name '{rendered}' ({len(rendered)} chars) exceeds 25"
 
 
+def test_vpc_connector_specifies_max_instances() -> None:
+    # Regression: the GCP API rejects a connector create call unless
+    # max_throughput or max_instances is explicit -- left implicit, the
+    # apply failed with "must specify either max_throughput or max_instances".
+    body = (_TF / "langfuse_network.tf").read_text()
+    block = body.split('resource "google_vpc_access_connector" "langfuse"', 1)[1].split(
+        "\nresource ", 1
+    )[0]
+    assert "max_instances" in block
+
+
 def test_cloud_sql_instance_gets_a_private_network() -> None:
     # Regression: the first apply used the instance's PUBLIC IP for the
     # Langfuse DSN and failed (`P1001: Can't reach database server`) —

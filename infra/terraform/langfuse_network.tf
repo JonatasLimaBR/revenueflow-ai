@@ -47,6 +47,11 @@ resource "google_vpc_access_connector" "langfuse" {
   region        = var.region
   network       = data.google_compute_network.default.name
   ip_cidr_range = "10.8.0.0/28"
+  # The GCP API rejects "must specify either max_throughput or
+  # max_instances" when both are left implicit -- low, fixed bounds are
+  # plenty for one low-traffic Cloud Run service reaching one Cloud SQL IP.
+  min_instances = 2
+  max_instances = 3
 
   depends_on = [google_project_service.this]
 }
