@@ -344,18 +344,56 @@ Trace) — pendente: subir uma instância de Langfuse self-hosted em produção 
 OBSERVABILITY_OPS — a frase "produção passa a `TRACER_SINK=otel`" ali está desatualizada/nunca foi
 verdade na prática; não corrigida ainda no bullet original, só registrada aqui.
 
+**Incidente 2026-09-08 — cadeia de 6 fixes até o WhatsApp end-to-end funcionar de verdade**: o
+teste real do CTA (ADR-066) revelou que "webhook aceita e Pub/Sub publica" nunca foi o mesmo que
+"o cliente recebe a recomendação real" — 6 achados reais em produção, cada um mascarando o
+seguinte:
+1. **Cliente Vertex reconstruído a cada chamada** (`services/llm.py::_vertex_client()`) —
+   resolução de credenciais ADC síncrona no event loop em toda chamada de LLM, fora do
+   `asyncio.wait_for`. Um turno chegou a 239s. Fix: client cacheado por processo.
+2. **`AsyncConnectionPool` da app fixo em 4 conexões** (default do psycopg_pool nunca
+   configurado) — `error connecting in 'pool-1': connection timeout expired` sob carga real.
+   Fix: `min_size=2, max_size=10`.
+3. **Checkpointer do LangGraph com uma conexão bare só, pra vida toda do processo**
+   (`AsyncPostgresSaver.from_conn_string`), atrás do próprio `asyncio.Lock()` da lib, compartilhada
+   por todo turno concorrente. Fix: `AsyncPostgresSaver(AsyncConnectionPool(...))` — a lib aceita
+   pool nativamente.
+4. **`turn_budget_s=15` e `ack_deadline_seconds=60` apertados demais** pra 2 chamadas Gemini
+   reais sequenciais + overhead de DB — um turno legítimo sem bug nenhum levava ~30s. Pior: o
+   Pub/Sub redeliverava a mensagem **enquanto ela ainda estava sendo processada**, gerando
+   processamento concorrente duplicado da mesma mensagem (confirmado ao vivo: a mesma mensagem
+   processada 3x em paralelo). Fix: `turn_budget_s=25`, `ack_deadline_seconds=120`.
+5. **`revenueflow-api` rodando no default bruto do Cloud Run (512Mi/1 CPU)**, nunca configurado
+   explicitamente — não sustentava LangGraph + 2 pools de até 10 conexões + cliente Vertex sob
+   reentrega concorrente. Bate com o padrão "Starting new instance" → "Shutting down" ~10s
+   depois, no meio do processamento, sem log de ack/nack — consistente com OOM kill. Fix:
+   `memory=2Gi`.
+6. **Negociação perdia o produto em qualquer follow-up sem repetir o nome dele**
+   (`recommendation_node` refazia a busca por produto todo turno e sobrescrevia `tool_results` com
+   resultado vazio quando a mensagem não citava produto — ex.: "pode fazer por 700?"). Fix: se a
+   busca do turno não acha nada e já havia produto estabelecido, retorna `{}` (preserva o estado
+   do checkpointer em vez de apagar).
+
+Depois do fix #5, turnos novos passaram a processar em segundos (2.5s–12.9s), sem redelivery, com
+resposta real do Gemini entregue via WhatsApp — confirmado com uma sequência de negociação real
+(quoted → proposed → clarify). Catálogo simulado também expandido nesse mesmo dia: 6→24 produtos,
+3→15 clientes (`seeds/*.json`), já carregado em produção via `revenueflow-api-migrate`. Landing
+page ganhou uma seção "Simular" com 5 cenários de teste (preço/estoque/desconto/pedido/handoff) +
+tabela do catálogo com preço real.
+
 Pendências operacionais: valores reais dos secrets do WhatsApp (✅ preenchidos e token permanente
 gerado 2026-09-07), registro do webhook no Meta (✅ confirmado, incl. inscrição da WABA no app —
-2026-09-07), migração do banco (✅ `0006`–`0014` aplicadas em 2026-09-06), DNS dos subdomínios do
-ADR-074 (✅ `mcp`/`portal.mastavista.com.br` já resolvem — falta só o certificado sair de
-`PROVISIONING`), `gcloud run jobs execute revenueflow-api-opportunity-scan`/`-lead-sweep`/
-`-analytics-sync` (rodar pela 1ª vez depois do fix do pool acima — `campaign-run` já rodou, mas
-sem efeito real ainda: nenhum cliente tem `consent_opt_in_at`), popular `consent_opt_in_at` de
-clientes reais, preencher `ALERT_EMAIL` nas GitHub Actions repo variables (`DASHBOARD_VIEWER_EMAILS`
-✅ preenchida), distribuir o valor de `gcloud secrets versions access latest
---secret=revenueflow-mcp-api-token` pra quem for usar o MCP público, criar o OAuth Client ID do
-portal (ver bullet PORTAL acima), subir Langfuse em produção (ver achado acima), e investigar a
-latência do primeiro turno real (~4min webhook→subscriber + estouro de `turn_budget_s`).
+2026-09-07), migração do banco (✅ `0006`–`0014` aplicadas em 2026-09-06), DNS + certificado dos
+subdomínios do ADR-074 (✅ `mastavista.com.br`/`mcp`/`portal` — certificado `ACTIVE` nos 3
+domínios, confirmado 2026-09-08), os 4 jobs batch (✅ `opportunity-scan`/`lead-sweep`/
+`analytics-sync`/`campaign-run` — todos já rodaram com sucesso em 2026-09-06), `ALERT_EMAIL` nas
+GitHub Actions repo variables (✅ `jonalic@gmail.com`, `DASHBOARD_VIEWER_EMAILS` ✅ preenchida),
+token do MCP público (✅ distribuído — usuário configurou o conector no claude.ai com
+`mcp.mastavista.com.br`), OAuth Client ID do portal (✅ configurado, login real confirmado
+funcionando com 3 contas), latência do primeiro turno (✅ investigada e corrigida — ver cadeia de
+6 fixes acima). **Restam**: popular `consent_opt_in_at` de clientes reais (deferido
+deliberadamente — só quando o cliente responder no WhatsApp, per decisão do usuário), e subir
+Langfuse em produção (achado acima, ainda pendente).
 
 O código de aplicação **existe** e não é mais scaffolding.
 
