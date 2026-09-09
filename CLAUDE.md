@@ -386,14 +386,15 @@ entre o webhook aceitar e o subscriber processar, e o processamento em si estour
 Não investigado a fundo ainda (hipótese: warm-up de cliente Vertex/pool de conexão no primeiro
 turno real da instância) — acompanhar se turnos seguintes normalizam.
 
-**Achado à parte, não relacionado ao WhatsApp**: `TRACER_SINK` em produção está `noop`, não `otel`
-como o bullet OBSERVABILITY_OPS abaixo afirma — o `ADR-056` nunca chegou a ser de fato aplicado no
-`terraform.tfvars` real (só no `.tfvars.example`). Cloud Trace confirmado vazio (`gcloud alpha
-trace`/API REST, zero traces no dia). Usuário quer **Langfuse** em produção (não OTel/Cloud
-Trace) — pendente: subir uma instância de Langfuse self-hosted em produção (hoje só roda local via
-`docker-compose.yml`) e apontar `TRACER_SINK=langfuse` + as 3 vars `LANGFUSE_*`. Ver bullet
-OBSERVABILITY_OPS — a frase "produção passa a `TRACER_SINK=otel`" ali está desatualizada/nunca foi
-verdade na prática; não corrigida ainda no bullet original, só registrada aqui.
+**Achado à parte, não relacionado ao WhatsApp (2026-09-07, resolvido 2026-09-09)**: `TRACER_SINK`
+em produção estava `noop`, não `otel` como o bullet OBSERVABILITY_OPS abaixo afirma — o `ADR-056`
+nunca chegou a ser de fato aplicado. Usuário queria **Langfuse** em produção (não OTel/Cloud
+Trace) — resolvido pela fatia LANGFUSE_SELF_HOSTED (ADR-075): `var.tracer_sink` default virou
+`"langfuse"` depois do onboarding manual (1ª conta admin, org/project, par de API keys, secrets
+populados) confirmado em 2026-09-09 — `AuditTracer` agora envia de verdade pro Langfuse
+self-hosted em `langfuse.mastavista.com.br`. Ver bullet OBSERVABILITY_OPS — a frase "produção
+passa a `TRACER_SINK=otel`" ali continua desatualizada/nunca foi verdade na prática (produção usa
+`langfuse`, não `otel`); não corrigida no bullet original, só registrada aqui.
 
 **Incidente 2026-09-08 — cadeia de 6 fixes até o WhatsApp end-to-end funcionar de verdade**: o
 teste real do CTA (ADR-066) revelou que "webhook aceita e Pub/Sub publica" nunca foi o mesmo que
@@ -444,11 +445,12 @@ token do MCP público (✅ distribuído — usuário configurou o conector no cl
 funcionando com 3 contas), latência do primeiro turno (✅ investigada e corrigida — ver cadeia de
 6 fixes acima), negociação perdendo contexto de desconto/quantidade em follow-up (✅ corrigido —
 `negotiation_node` reaplica o desconto/quantidade já estabelecidos quando o turno atual não os
-repete, PR #94). **Restam**: popular `consent_opt_in_at` de clientes reais (deferido
-deliberadamente — só quando o cliente responder no WhatsApp, per decisão do usuário), e subir
-Langfuse em produção (infra pronta no ADR-075 — Cloud Run/banco/secrets/subdomínio; falta o DNS de
-`langfuse.mastavista.com.br`, criar a 1ª conta admin, gerar o par de API keys, popular
-`LANGFUSE_PUBLIC_KEY`/`LANGFUSE_SECRET_KEY`, e virar `var.tracer_sink` pra `"langfuse"`).
+repete, PR #94). Langfuse em produção (✅ concluído 2026-09-09 — DNS/certificado/1ª conta
+admin/API keys/`var.tracer_sink="langfuse"`, todos os passos manuais do ADR-075 fechados; ver
+correção pós-merge do ADR-075 e o ADR-076 pro incidente de outage de ~40min do certificado durante
+esse processo), os 4 jobs batch agora rodam sozinhos via Cloud Scheduler (✅ ADR-076, 2026-09-09 —
+não mais só sob demanda). **Resta**: popular `consent_opt_in_at` de clientes reais (deferido
+deliberadamente — só quando o cliente responder no WhatsApp, per decisão do usuário).
 
 O código de aplicação **existe** e não é mais scaffolding.
 
