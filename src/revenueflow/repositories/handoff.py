@@ -6,6 +6,7 @@ unique index from ``0008`` (``INSERT ... ON CONFLICT DO NOTHING`` + read-back).
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 from uuid import uuid4
 
@@ -34,7 +35,18 @@ WHERE status = %s
 ORDER BY created_at DESC
 """
 
-_RESOLVE = "UPDATE handoff SET status = 'RESOLVED' WHERE handoff_id = %s AND status = 'PENDING'"
+_SELECT_STALE_PENDING = """
+SELECT handoff_id, conversation_id, reason, context, status, created_at
+FROM handoff
+WHERE status = 'PENDING' AND created_at < %s
+ORDER BY created_at
+"""
+
+_RESOLVE = """
+UPDATE handoff SET status = 'RESOLVED'
+ WHERE handoff_id = %s AND status = 'PENDING'
+RETURNING conversation_id
+"""
 
 
 def _to_handoff(row: dict[str, Any]) -> Handoff:
@@ -70,5 +82,16 @@ async def list_by_status(conn: AsyncConnection[Any], status: HandoffStatus) -> l
     return [_to_handoff(row) for row in rows]
 
 
-async def resolve(conn: AsyncConnection[Any], handoff_id: str) -> int:
-    return await execute(conn, _RESOLVE, (handoff_id,))
+async def list_stale_pending(conn: AsyncConnection[Any], older_than: datetime) -> list[Handoff]:
+    """PENDING handoffs created before ``older_than`` (no human ever acted)."""
+
+    rows = await fetchall(conn, _SELECT_STALE_PENDING, (older_than,))
+    return [_to_handoff(row) for row in rows]
+
+
+async def resolve(conn: AsyncConnection[Any], handoff_id: str) -> str | None:
+    """Resolve a PENDING handoff; returns its conversation_id, or None if it
+    was already resolved (or never existed)."""
+
+    row = await fetchone(conn, _RESOLVE, (handoff_id,))
+    return str(row["conversation_id"]) if row is not None else None

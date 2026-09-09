@@ -41,6 +41,7 @@ class Settings(BaseSettings):
     handoff_api_token: str = ""
     handoff_min_confidence: float = 0.55
     handoff_high_value_threshold: Decimal = Decimal("50000")
+    handoff_stale_hours: int = 24
 
     audit_enabled: bool = True
 

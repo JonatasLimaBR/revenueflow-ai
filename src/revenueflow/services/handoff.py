@@ -10,10 +10,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from revenueflow.domain.models import HandoffReason, HandoffStatus, OpportunityStatus
+from revenueflow.domain.models import HandoffReason, HandoffStatus, OpportunityStatus, SessionStatus
 from revenueflow.repositories import customer as customer_repo
 from revenueflow.repositories import handoff as handoff_repo
 from revenueflow.repositories import opportunity as opportunity_repo
+from revenueflow.repositories import session as session_repo
 from revenueflow.repositories.db import read_connection, unit_of_work
 
 
@@ -94,4 +95,11 @@ async def list_pending() -> list[dict[str, Any]]:
 
 async def resolve(handoff_id: str) -> bool:
     async with unit_of_work() as conn:
-        return await handoff_repo.resolve(conn, handoff_id) == 1
+        conversation_id = await handoff_repo.resolve(conn, handoff_id)
+        if conversation_id is None:
+            return False
+        # Resolving the handoff has to hand the conversation back to the
+        # graph -- found live: the session stayed stuck in HUMAN_HANDOFF
+        # forever after resolve, because nothing reverted its status.
+        await session_repo.update_status(conn, conversation_id, SessionStatus.OPEN)
+    return True

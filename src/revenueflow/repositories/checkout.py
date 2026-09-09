@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Any
 
 from psycopg import AsyncConnection
@@ -16,6 +17,9 @@ SELECT quote_id, conversation_id, customer_ref, items, total, expiration, status
 FROM quote WHERE conversation_id = %s AND status = 'SENT'
 """
 _SET_QUOTE_STATUS = "UPDATE quote SET status = %s WHERE quote_id = %s"
+_EXPIRE_STALE_QUOTES = """
+UPDATE quote SET status = 'EXPIRED' WHERE status = 'SENT' AND expiration < %s
+"""
 
 _INSERT_ORDER = """
 INSERT INTO sales_order (order_id, quote_id, customer_ref, items, total, status)
@@ -81,6 +85,12 @@ async def get_open_quote(conn: AsyncConnection[Any], conversation_id: str) -> Qu
 
 async def set_quote_status(conn: AsyncConnection[Any], quote_id: str, status: QuoteStatus) -> None:
     await execute(conn, _SET_QUOTE_STATUS, (status.value, quote_id))
+
+
+async def expire_stale_quotes(conn: AsyncConnection[Any], now: datetime) -> int:
+    """Mark SENT quotes past their validity as EXPIRED; returns the count."""
+
+    return await execute(conn, _EXPIRE_STALE_QUOTES, (now,))
 
 
 async def create_order(conn: AsyncConnection[Any], order: Order) -> Order:

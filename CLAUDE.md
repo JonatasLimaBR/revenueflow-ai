@@ -300,6 +300,27 @@ Fatias entregues, arquivadas em `.claude/sdd/archive/`:
   acabou de gerar — Cloud Scheduler não tem "rodar depois que X terminar" nativo),
   `analytics_sync` 22:00 UTC. **Sem** orquestração explícita de dependência (Cloud Workflows) —
   a folga de horário é suficiente pro volume atual.
+- **EXPIRATION_TTL_SWEEP** (2026-09-09, ADR-077) — achado ao vivo enquanto o usuário testava o
+  fluxo end-to-end de novo: uma `Approval` que ninguém decidiu deixou o checkpoint do LangGraph
+  pausado em `await_approval` **para sempre** — toda mensagem seguinte da mesma conversa caía na
+  resposta fixa "sua solicitação ainda está em análise", sem nunca progredir (`Approval` já tinha
+  `expires_at` desde o ADR-050, mas nada verificava isso proativamente). Destravado manualmente
+  primeiro (conectando direto no Cloud SQL via Cloud SQL Python Connector — `psql`/`cloud-sql-proxy`
+  não estavam disponíveis localmente — e limpando o checkpoint dessa conversa: 402 linhas de
+  `checkpoint_writes`, 55 de `checkpoint_blobs`, 137 de `checkpoints`), depois corrigido de vez.
+  `services/expiration.py::sweep()` (batch, fora do grafo, ADR-019/020, Cloud Scheduler de hora em
+  hora — não diário como os outros 4 Jobs, `infra/terraform/expiration_sweep_job.tf`): Approval
+  `PENDING` vencida publica `approval_decided` (mesmo evento da rota humana —
+  `apply_decision_node` já se auto-detecta expirado a partir de `expires_at`, só faltava alguém
+  disparar o resume); Quote `SENT` vencida vira `EXPIRED` (para de aparecer em `get_open_quote`);
+  Handoff `PENDING` mais velho que `handoff_stale_hours` (novo, default 24h) é auto-resolvido e a
+  sessão volta pra `OPEN`. **Segundo bug achado na mesma investigação, mesmo PR**: resolver um
+  Handoff (`POST /internal/handoffs/{id}`) nunca revertia `conversation_session.status` — a sessão
+  ficava presa em `HUMAN_HANDOFF` mesmo depois do atendente marcar como resolvido; corrigido em
+  `services/handoff.py::resolve` (agora sempre reabre a sessão, não só no caminho de expiração
+  automática). `0015` cria índices parciais em `approval`/`quote` pro sweep horário. **Sem**
+  notificação quando um Handoff expira sem resolução humana, sem TTL configurável por
+  conversa/cliente (ADR-077).
 
 Deploy: **auditoria em 2026-09-05 (ADR-069 a 072) achou que nenhum deploy real tinha rodado desde
 CUSTOMER_360 (2026-09-03)** — o ambiente GitHub `production` tem um gate de aprovação manual
@@ -764,3 +785,4 @@ Claude deve localizar e ler os documentos relacionados antes de implementar.
 - [ADR-074 — Subdomínios mcp./portal. via Serverless NEG no mesmo Load Balancer (ADR-068 estendido)](docs/adrs/adr-074-mcp-and-portal-subdomains.md)
 - [ADR-075 — Langfuse self-hosted em produção (ADR-045 emendado)](docs/adrs/adr-075-langfuse-self-hosted-production.md)
 - [ADR-076 — Cloud Scheduler encadeando os 4 jobs batch](docs/adrs/adr-076-cloud-scheduler-batch-jobs.md)
+- [ADR-077 — TTL de aprovações, propostas e handoffs pendentes](docs/adrs/adr-077-expiration-ttl-sweep.md)
