@@ -1,4 +1,4 @@
-"""Opportunity Engine batch scan (SPEC-018, ADR-019).
+"""Opportunity Engine batch scan (SPEC-018, ADR-019, ADR-079).
 
 ``scan`` runs outside the LangGraph turn and the ``process_event`` consumer: it
 pulls candidate signals, applies the pure rules from
@@ -13,9 +13,11 @@ A failing candidate is logged with the run ``trace_id`` and counted in
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable, Iterable
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
+from typing import Any
 from uuid import uuid4
 
 from psycopg import AsyncConnection
@@ -34,6 +36,12 @@ _LOGGER = logging.getLogger(__name__)
 class ScanResult:
     replenishment: int = 0
     quote_recovery: int = 0
+    churn: int = 0
+    reactivation: int = 0
+    order_recovery: int = 0
+    cross_sell: int = 0
+    upsell: int = 0
+    inventory_to_cash: int = 0
     created: int = 0
     errors: int = 0
 
@@ -43,11 +51,31 @@ async def _persist(conn: AsyncConnection[object], opp: Opportunity) -> bool:
     return stored.opportunity_id == opp.opportunity_id
 
 
+async def _apply(
+    conn: AsyncConnection[object],
+    result: ScanResult,
+    *,
+    counter: str,
+    candidates: Iterable[Any],
+    rule: Callable[..., Opportunity | None],
+    key: Callable[[Any], str],
+    **rule_kwargs: Any,
+) -> None:
+    for signal in candidates:
+        setattr(result, counter, getattr(result, counter) + 1)
+        try:
+            opp = rule(signal, **rule_kwargs)
+            if opp is not None and await _persist(conn, opp):
+                result.created += 1
+        except Exception:
+            result.errors += 1
+            get_tracer().event("oppscan.candidate_failed", attrs={"type": counter})
+            _LOGGER.exception("%s candidate failed: %s", counter, key(signal))
+
+
 async def scan(*, now: datetime | None = None) -> ScanResult:
     settings = get_settings()
     moment = now or datetime.now(UTC)
-    threshold = Decimal(str(settings.replenishment_threshold))
-    limit_hours = settings.quote_recovery_hours
     result = ScanResult()
     token = set_tracer(
         new_tracer(
@@ -57,28 +85,87 @@ async def scan(*, now: datetime | None = None) -> ScanResult:
     )
     try:
         async with unit_of_work() as conn:
-            for signal in await opportunity_repo.replenishment_candidates(conn):
-                result.replenishment += 1
-                try:
-                    opp = opportunity_policy.replenishment(signal, now=moment, threshold=threshold)
-                    if opp is not None and await _persist(conn, opp):
-                        result.created += 1
-                except Exception:
-                    result.errors += 1
-                    get_tracer().event("oppscan.candidate_failed", attrs={"type": "replenishment"})
-                    _LOGGER.exception("replenishment candidate failed: %s", signal.customer_id)
-            for quote_signal in await opportunity_repo.stale_quote_candidates(conn):
-                result.quote_recovery += 1
-                try:
-                    opp = opportunity_policy.quote_recovery(
-                        quote_signal, now=moment, limit_hours=limit_hours
-                    )
-                    if opp is not None and await _persist(conn, opp):
-                        result.created += 1
-                except Exception:
-                    result.errors += 1
-                    get_tracer().event("oppscan.candidate_failed", attrs={"type": "quote_recovery"})
-                    _LOGGER.exception("quote recovery candidate failed: %s", quote_signal.quote_id)
+            replenishment_signals = await opportunity_repo.replenishment_candidates(conn)
+            await _apply(
+                conn,
+                result,
+                counter="replenishment",
+                candidates=replenishment_signals,
+                rule=opportunity_policy.replenishment,
+                key=lambda s: s.customer_id,
+                now=moment,
+                threshold=Decimal(str(settings.replenishment_threshold)),
+            )
+            await _apply(
+                conn,
+                result,
+                counter="churn",
+                candidates=replenishment_signals,
+                rule=opportunity_policy.churn,
+                key=lambda s: s.customer_id,
+                now=moment,
+                threshold=Decimal(str(settings.churn_threshold)),
+            )
+            await _apply(
+                conn,
+                result,
+                counter="reactivation",
+                candidates=replenishment_signals,
+                rule=opportunity_policy.reactivation,
+                key=lambda s: s.customer_id,
+                now=moment,
+                threshold=Decimal(str(settings.reactivation_threshold)),
+            )
+            await _apply(
+                conn,
+                result,
+                counter="quote_recovery",
+                candidates=await opportunity_repo.stale_quote_candidates(conn),
+                rule=opportunity_policy.quote_recovery,
+                key=lambda s: s.quote_id,
+                now=moment,
+                limit_hours=settings.quote_recovery_hours,
+            )
+            await _apply(
+                conn,
+                result,
+                counter="order_recovery",
+                candidates=await opportunity_repo.order_recovery_candidates(conn),
+                rule=opportunity_policy.order_recovery,
+                key=lambda s: s.order_id,
+                now=moment,
+                min_age_hours=settings.order_recovery_hours,
+            )
+            await _apply(
+                conn,
+                result,
+                counter="cross_sell",
+                candidates=await opportunity_repo.cross_sell_candidates(conn),
+                rule=opportunity_policy.cross_sell,
+                key=lambda s: s.customer_id,
+                now=moment,
+            )
+            await _apply(
+                conn,
+                result,
+                counter="upsell",
+                candidates=await opportunity_repo.upsell_candidates(conn),
+                rule=opportunity_policy.upsell,
+                key=lambda s: s.customer_id,
+                now=moment,
+                min_repeat_purchases=settings.upsell_min_repeat_purchases,
+            )
+            await _apply(
+                conn,
+                result,
+                counter="inventory_to_cash",
+                candidates=await opportunity_repo.inventory_to_cash_candidates(conn),
+                rule=opportunity_policy.inventory_to_cash,
+                key=lambda s: s.customer_id,
+                now=moment,
+                stock_threshold=settings.inventory_to_cash_stock_threshold,
+                stale_days_threshold=settings.inventory_to_cash_stale_days,
+            )
         get_tracer().event("oppscan.done", attrs=asdict(result))
         get_tracer().end(outcome="scanned")
         return result

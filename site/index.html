@@ -6,7 +6,7 @@
   <meta http-equiv="Content-Security-Policy"
         content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; frame-ancestors 'none'">
   <meta name="description"
-        content="RevenueFlow AI — agente comercial B2B via WhatsApp sobre GCP e Vertex AI. LLM interpreta, um Policy Engine determinístico decide, a API executa. 28 fatias entregues, do webhook à venda ativa com opt-in.">
+        content="RevenueFlow AI — agente comercial B2B via WhatsApp sobre GCP e Vertex AI. LLM interpreta, um Policy Engine determinístico decide, a API executa. 29 fatias entregues, do webhook ao Opportunity Engine completo.">
   <title>RevenueFlow AI</title>
   <link rel="stylesheet" href="assets/styles.css">
 </head>
@@ -42,11 +42,11 @@
       </div>
       <div class="stats">
         <div class="stat">
-          <span class="stat__value">28</span>
+          <span class="stat__value">29</span>
           <span class="stat__label">fatias entregues</span>
         </div>
         <div class="stat">
-          <span class="stat__value">78</span>
+          <span class="stat__value">79</span>
           <span class="stat__label">ADRs documentados</span>
         </div>
         <div class="stat">
@@ -65,7 +65,7 @@
     <div class="container">
       <div class="section__head">
         <span class="eyebrow">Do webhook ao portal operacional</span>
-        <h2 id="fases-title">Dez fases, vinte e oito fatias, uma jornada comercial completa</h2>
+        <h2 id="fases-title">Dez fases, vinte e nove fatias, uma jornada comercial completa</h2>
         <p>
           Cada fatia foi entregue com o ciclo completo do projeto — Brainstorm, Define, Design,
           Build, Ship — e mergeada em <code>main</code> só depois de todos os checks do CI
@@ -296,6 +296,10 @@
               <span class="slice__name">WHATSAPP_OPT_IN</span>
               <p>Responder <strong>"ACEITO RECEBER OFERTAS"</strong> registra consentimento de contato ativo — simétrico ao <code>PARAR</code> que já existia pro opt-out, mesma regra determinística, sem passar pelo modelo.</p>
             </div>
+            <div class="slice">
+              <span class="slice__name">OPPORTUNITY_ENGINE_REMAINING_TYPES</span>
+              <p>Os 6 tipos de oportunidade que faltavam do PRD-010 — <strong>churn, reativação, recuperação de pedido, cross-sell, upsell e giro de estoque</strong> — cada um com sua própria regra determinística, sem modelo decidindo o gatilho.</p>
+            </div>
           </div>
         </article>
 
@@ -459,7 +463,7 @@
     <div class="container">
       <div class="section__head">
         <span class="eyebrow">O que vem a seguir</span>
-        <h2 id="roadmap-title">O roadmap não para nas 28 fatias entregues</h2>
+        <h2 id="roadmap-title">O roadmap não para nas 29 fatias entregues</h2>
         <p>Cada item abaixo é uma decisão já registrada em ADR — não uma promessa vaga de "em breve".</p>
       </div>
 
@@ -467,14 +471,8 @@
         <div class="timeline__item timeline__item--done">
           <span class="timeline__dot" aria-hidden="true"></span>
           <span class="timeline__tag">Você está aqui</span>
-          <h4>WHATSAPP_OPT_IN <code>ADR-078</code></h4>
-          <p>Fluxo de opt-in via WhatsApp, simétrico ao guard de opt-out já em produção — responder "ACEITO RECEBER OFERTAS" registra consentimento, sem passar pelo modelo.</p>
-        </div>
-        <div class="timeline__item">
-          <span class="timeline__dot" aria-hidden="true"></span>
-          <span class="timeline__tag">Próxima fatia</span>
-          <h4>Os 6 tipos de oportunidade do PRD-010</h4>
-          <p>Hoje só 2 de 6 tipos de oportunidade rodam em produção (recompra atrasada e proposta parada) — faltam 4 regras determinísticas novas no Opportunity Engine.</p>
+          <h4>OPPORTUNITY_ENGINE_REMAINING_TYPES <code>ADR-079</code></h4>
+          <p>Os 8 tipos de oportunidade do PRD-010 rodam em produção: recompra atrasada, proposta parada, churn, reativação, recuperação de pedido, cross-sell, upsell e giro de estoque — cada um sua própria regra determinística.</p>
         </div>
       </div>
 

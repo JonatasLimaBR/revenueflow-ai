@@ -34,6 +34,16 @@ class Settings(BaseSettings):
     quote_recovery_hours: int = 72
     campaign_frequency_cap_days: int = 14
 
+    # PRD-010: the remaining 6 opportunity types (ADR-079). CHURN/REACTIVATION
+    # share the same "time since last purchase" signal as REPLENISHMENT, just
+    # at a higher multiplier -- REACTIVATION is strictly the more severe tier.
+    churn_threshold: float = 3.0
+    reactivation_threshold: float = 6.0
+    order_recovery_hours: int = 24
+    upsell_min_repeat_purchases: int = 2
+    inventory_to_cash_stock_threshold: int = 10
+    inventory_to_cash_stale_days: int = 60
+
     bigquery_dataset: str = "revenueflow_analytics"
 
     lead_stale_days: int = 30

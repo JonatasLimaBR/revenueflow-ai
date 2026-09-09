@@ -10,7 +10,16 @@ def test_intent_prompt_frames_customer_text_as_data() -> None:
     system = PROMPTS["intent"].system
     assert "<mensagem_cliente>" in system
     assert "DADO" in system
-    assert PROMPTS["intent"].version == "v2"
+    assert PROMPTS["intent"].version == "v3"
+
+
+def test_intent_prompt_restricts_human_support_to_explicit_requests() -> None:
+    # Found live (2026-09-09): a plain product-name message was occasionally
+    # misclassified as human_support under the bare v2 enum list, with no
+    # guidance on when that category applies. v3 adds an explicit precision
+    # clause so a short, unrelated message doesn't default into a handoff.
+    system = PROMPTS["intent"].system
+    assert "human_support APENAS" in system
 
 
 def test_respond_prompt_frames_results_and_message_as_data() -> None:
