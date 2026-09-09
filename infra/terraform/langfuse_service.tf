@@ -24,15 +24,23 @@ resource "google_cloud_run_v2_service" "langfuse" {
   location = var.region
   ingress  = "INGRESS_TRAFFIC_ALL"
 
-  # Stateless (state lives in its own Postgres database) — scale to zero
-  # between uses, same as the read-only MCP server.
   deletion_protection = false
 
   template {
     service_account = google_service_account.api.email
 
+    # Found live (2026-09-09): scale-to-zero here silently drops every
+    # trace. The AuditTracer's LangfuseTracer flushes span/generation/event
+    # calls fire-and-forget through the SDK's own HTTP client, which times
+    # out well before a cold Next.js start (~18s measured) finishes — the
+    # ingestion request never reaches this service at all (zero
+    # /api/public/ingestion hits in its logs despite real turns running),
+    # and the client just logs "Unexpected error occurred" and moves on.
+    # min_instance_count=1 keeps it warm (~150ms once warm), same fix as
+    # the portal service and for the same class of reason: a dependency
+    # the app calls synchronously-ish per turn can't tolerate a cold start.
     scaling {
-      min_instance_count = 0
+      min_instance_count = 1
       max_instance_count = 2
     }
 
