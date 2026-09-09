@@ -11,10 +11,14 @@ def test_langfuse_service_declared() -> None:
     assert "container_port = 3000" in body
 
 
-def test_langfuse_scales_to_zero() -> None:
+def test_langfuse_stays_warm_to_avoid_dropping_traces_on_cold_start() -> None:
+    # Found live (2026-09-09): scale-to-zero here meant a cold Next.js start
+    # (~18s measured) outlived the Langfuse SDK's own HTTP client timeout on
+    # every trace flush, so no ingestion request ever reached this service
+    # and every turn's trace was silently dropped.
     body = (_TF / "langfuse_service.tf").read_text()
     block = body.split('resource "google_cloud_run_v2_service" "langfuse"', 1)[1]
-    assert "min_instance_count = 0" in block
+    assert "min_instance_count = 1" in block
 
 
 def test_langfuse_invoker_is_public_app_level_auth() -> None:
