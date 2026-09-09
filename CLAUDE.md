@@ -331,6 +331,41 @@ Fatias entregues, arquivadas em `.claude/sdd/archive/`:
   `consent_opt_in_at` (só quando `customer_id` já existe) e responde fixo, sem passar pelo grafo.
   **Sem** pergunta proativa de opt-in em algum ponto do fluxo — a frase precisa ser comunicada ao
   cliente por fora (campanha, landing page) pra virar utilizável na prática (ADR-078).
+- **OPPORTUNITY_ENGINE_REMAINING_TYPES** (2026-09-09, ADR-079) — fecha a lacuna do PRD-010: só 2
+  dos 8 tipos de oportunidade listados (REPLENISHMENT, QUOTE_RECOVERY) tinham regra implementada.
+  Usuário autorizou explicitamente implementar os 6 restantes de uma vez, decisão de negócio por
+  minha conta, documentada no ADR-079. CHURN/REACTIVATION reusam o sinal do REPLENISHMENT
+  (`ReplenishmentSignal`) em multiplicadores mais altos (`churn_threshold=3.0`,
+  `reactivation_threshold=6.0`), `product=None` (sinal de relacionamento, não de produto) — **não**
+  são mutuamente exclusivas com REPLENISHMENT (índice único é por tipo, não por cliente).
+  ORDER_RECOVERY = `sales_order(FAILED)` sem retentativa `PAID`/`CONFIRMED` depois, com piso de
+  idade (`order_recovery_hours=24`). CROSS_SELL sempre oferece o acessório mais barato do catálogo
+  (heurística — sem mapa de compatibilidade produto↔acessório). UPSELL recomenda o próximo produto
+  mais caro da mesma categoria pra quem recomprou (`upsell_min_repeat_purchases=2`).
+  INVENTORY_TO_CASH inverte a direção do sinal (parte do produto parado em estoque, não do
+  cliente). `services/opportunity.py::scan()` generaliza de 2 para 8 chamadas via um helper privado
+  `_apply()` (contagem + `try/except` isolado por candidato, mesmo padrão de antes). Sem migração
+  nova (o índice único parcial de `0007` já cobre qualquer `opportunity_type`).
+
+**Incidente 2026-09-09**: usuário reportou "Langfuse ainda sem dados" (de novo, apesar do pin
+`langfuse<3` do PR #104) e, em paralelo, a mesma conversa de teste caindo em handoff humano em
+mensagens triviais de produto. Investigados juntos:
+1. **Langfuse**: `revenueflow-api-langfuse` tinha `min_instance_count=0` — todo flush de trace
+   sofria cold start (~18s medido direto) que estourava o timeout do cliente HTTP do SDK antes da
+   requisição sequer chegar no serviço (zero hits em `/api/public/ingestion` nos logs, apesar de
+   turnos reais rodando). Corrigido com `min_instance_count=1` (mesmo ajuste do portal, mesma
+   classe de motivo — dependência chamada por turno não tolera cold start).
+2. **Handoff em mensagem trivial**: não era bug de código — `classify_intent_node` isola
+   `LLMError` corretamente (confirmado: nenhuma exceção não-tratada, `handoff_reason` real era
+   `explicit_request`, não `intent`). O Gemini genuinamente classificou mensagens como "Bomba
+   d'água centrífuga 1.5CV 220V" como `human_support` algumas vezes — reprodução local do mesmo
+   texto retornou a classificação correta. O prompt v2 (`services/prompts.py`) não dava nenhum
+   critério de precisão pra `human_support`, só listava o enum; `_INTENT_SYSTEM` v3 adiciona uma
+   cláusula explícita ("APENAS quando o cliente pedir explicitamente para falar com uma pessoa,
+   atendente ou humano") e `classify_intent_node` ganhou um log em INFO sempre que classificar
+   `human_support`, pra confirmar se o v3 reduz a taxa ou se acontecer de novo com evidência
+   melhor. Sem certeza absoluta de causa raiz (ruído de LLM não é 100% eliminável), mas o prompt
+   mais preciso e o logging novo são a mitigação disponível nesta fatia.
 
 Deploy: **auditoria em 2026-09-05 (ADR-069 a 072) achou que nenhum deploy real tinha rodado desde
 CUSTOMER_360 (2026-09-03)** — o ambiente GitHub `production` tem um gate de aprovação manual
@@ -508,8 +543,8 @@ Mapa de `src/revenueflow/`:
 | `events` | `EventEnvelope`; porta `EventPublisher` (`in_memory`/`pubsub`) |
 | `adapters` | portas de canal; `verify_signature` + `parse_inbound`; `WhatsAppOutbound` + `FakeOutbound` |
 | `repositories` | pool async psycopg; `processed_event`/`dispatch` (idempotência); `session` (+`set_customer`)/`lead` (`get_by_phone`/`get_by_id`/`set_status`/`stale_candidates`)/`customer` (`get_by_phone`/`customer_360`/`set_consent_opt_in`/`set_consent_opt_out`); `sim_*`; `sim_pricing`; `approval`; `checkout` (quote/order/payment); `opportunity` (`upsert_open`/`list_by_status`/`set_status` + queries de candidatos); `handoff` (`create` idempotente/`list_by_status`/`resolve`); `audit` (`record` `ON CONFLICT`/`by_conversation`); `outbound_contact` (`last_contact_at`/`record`); `analytics` (`conversation_revenue`/`cost_per_outcome`/`customer_360_all`/`lead_funnel`/`opportunity_summary`/`handoff_rate`, JSON-safe pra BigQuery) |
-| `policies` | `pricing_policy.evaluate()` (alçada/margem) + `opportunity_policy` (`replenishment`/`quote_recovery`) + `handoff_policy.should_handoff` (3 gatilhos) + `outbound_policy` (`evaluate` — Policy Gate de contato ativo; `is_opt_out` — guard inbound) + `lead_policy.advance` (transição de status, monotônica) — regras puras, sem I/O nem LLM |
-| `services` | `ingest`, `session` (+`phone_for`), `identity` (`customer` antes do `lead`), `prompts` (v2), `llm` (stub + Vertex real), `intent`, `respond`, `pricing`, `negotiation`, `approval`, `checkout` (`is_explicit_confirmation` + `quote_from_state` + `confirm`), `opportunity` (`scan()` — batch, fora do grafo), `handoff` (`build_context` SPEC-027 + `create`/`list_pending`/`resolve`), `audit` (`persist` falha-isolada + `reconstruct`), `campaign` (`run()` — batch, Policy Gate + envio, fora do grafo), `analytics_sync` (`run()` — batch, 6 cargas via `_SOURCES`, sync BigQuery `WRITE_TRUNCATE`, fora do grafo), `lead_lifecycle` (`advance_from_turn` — síncrono, promove a Customer em `WON`; `sweep_stale()` — batch, `LOST`) |
+| `policies` | `pricing_policy.evaluate()` (alçada/margem) + `opportunity_policy` (`replenishment`/`churn`/`reactivation`/`quote_recovery`/`order_recovery`/`cross_sell`/`upsell`/`inventory_to_cash`, ADR-053/079) + `handoff_policy.should_handoff` (3 gatilhos) + `outbound_policy` (`evaluate` — Policy Gate de contato ativo; `is_opt_out`/`is_opt_in` — guards inbound) + `lead_policy.advance` (transição de status, monotônica) — regras puras, sem I/O nem LLM |
+| `services` | `ingest`, `session` (+`phone_for`), `identity` (`customer` antes do `lead`), `prompts` (v2), `llm` (stub + Vertex real), `intent`, `respond`, `pricing`, `negotiation`, `approval`, `checkout` (`is_explicit_confirmation` + `quote_from_state` + `confirm`), `opportunity` (`scan()` — batch, fora do grafo, 8 tipos via helper `_apply()`, ADR-079), `handoff` (`build_context` SPEC-027 + `create`/`list_pending`/`resolve`), `audit` (`persist` falha-isolada + `reconstruct`), `campaign` (`run()` — batch, Policy Gate + envio, fora do grafo), `analytics_sync` (`run()` — batch, 6 cargas via `_SOURCES`, sync BigQuery `WRITE_TRUNCATE`, fora do grafo), `lead_lifecycle` (`advance_from_turn` — síncrono, promove a Customer em `WON`; `sweep_stale()` — batch, `LOST`) |
 | `tools` | `RECOMMENDATION_TOOLS` (5 read-only, incl. `get_customer_360`) + `NEGOTIATION_TOOLS` (3 de pricing) + `CHECKOUT_TOOLS` (`create_quote`/`create_order`/`create_payment_sandbox`, determinísticas, registry isolado) + `registry` (fronteira — nenhum `set_discount`) |
 | `agents` | `TurnState`; `recommendation_node` (anexa `get_customer_360` p/ cliente conhecido); `negotiation_node` (+check `high_value_order`) + `await_approval_node` + `apply_decision_node` (ADR-050); `checkout_node` (quote/confirmação/order/payment, ADR-051); `handoff.py` (`to_handoff` + `handoff_node` que persiste + marca `HUMAN_HANDOFF`, ADR-054); `build_graph` |
 | `mcp` | `tools.py` (leitura via `repositories.analytics` + ação via `httpx` nas rotas `/internal/*`, sem depender do pacote `mcp`) + `auth.py` (`bearer_gate` ASGI, também sem depender do pacote `mcp`) + `server.py` (`register_read_tools`/`register_action_tools`; servidor pessoal stdio, ADR-064, os dois) + `http_server.py` (servidor público Streamable HTTP, ADR-067, só `register_read_tools`) |
@@ -797,3 +832,4 @@ Claude deve localizar e ler os documentos relacionados antes de implementar.
 - [ADR-076 — Cloud Scheduler encadeando os 4 jobs batch](docs/adrs/adr-076-cloud-scheduler-batch-jobs.md)
 - [ADR-077 — TTL de aprovações, propostas e handoffs pendentes](docs/adrs/adr-077-expiration-ttl-sweep.md)
 - [ADR-078 — Fluxo de opt-in via WhatsApp, simétrico ao guard de opt-out](docs/adrs/adr-078-whatsapp-opt-in-flow.md)
+- [ADR-079 — Opportunity Engine: os 6 tipos restantes (CHURN, REACTIVATION, ORDER_RECOVERY, CROSS_SELL, UPSELL, INVENTORY_TO_CASH)](docs/adrs/adr-079-opportunity-engine-remaining-six-types.md)

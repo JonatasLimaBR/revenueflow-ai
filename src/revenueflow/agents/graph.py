@@ -8,6 +8,7 @@ no real model is called.
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from langgraph.graph import END, START, StateGraph
@@ -38,6 +39,8 @@ NEGOTIATION_INTENTS: frozenset[str] = frozenset(
 )
 CHECKOUT_INTENTS: frozenset[str] = frozenset({Intent.ORDER_REQUEST.value})
 
+_LOGGER = logging.getLogger(__name__)
+
 
 async def classify_intent_node(state: TurnState) -> dict[str, Any]:
     """Classify the customer text into a controlled intent plus confidence."""
@@ -46,7 +49,18 @@ async def classify_intent_node(state: TurnState) -> dict[str, Any]:
         try:
             intent, confidence = await classify(state["customer_text"])
         except LLMError:
+            _LOGGER.warning(
+                "classify_intent LLMError, routing to handoff: conversation_id=%s",
+                state["conversation_id"],
+                exc_info=True,
+            )
             return to_handoff("intent")
+    if intent is Intent.HUMAN_SUPPORT:
+        _LOGGER.info(
+            "classify_intent returned human_support: conversation_id=%s confidence=%.2f",
+            state["conversation_id"],
+            confidence,
+        )
     return {"intent": intent.value, "confidence": confidence}
 
 

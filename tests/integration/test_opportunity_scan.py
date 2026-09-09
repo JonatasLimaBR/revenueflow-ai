@@ -45,6 +45,24 @@ async def _stale_quote() -> tuple[str, str]:
     return quote_id, customer_ref
 
 
+_SEED_FAILED_ORDER = """
+INSERT INTO sales_order (order_id, quote_id, customer_ref, items, total, status, created_at)
+VALUES (%s, %s, %s, %s::jsonb, %s, 'FAILED', now() - interval '48 hours')
+"""
+
+
+async def _failed_order() -> tuple[str, str]:
+    order_id = uuid4().hex
+    customer_ref = f"CUST-OR-{uuid4().hex[:8]}"
+    async with unit_of_work() as conn:
+        await execute(
+            conn,
+            _SEED_FAILED_ORDER,
+            (order_id, uuid4().hex, customer_ref, '[{"product_id": "PMP-100-CEN"}]', "729.90"),
+        )
+    return order_id, customer_ref
+
+
 async def test_scan_detects_replenishment_and_quote_recovery(db: None) -> None:
     overdue = await _overdue_customer()
     quote_id, quote_customer = await _stale_quote()
@@ -67,6 +85,22 @@ async def test_scan_detects_replenishment_and_quote_recovery(db: None) -> None:
     rec = next(o for o in opens if o.customer_id == quote_customer)
     assert rec.opportunity_type is OpportunityType.QUOTE_RECOVERY
     assert rec.evidence["quote_id"] == quote_id
+
+
+async def test_scan_detects_order_recovery(db: None) -> None:
+    order_id, customer_ref = await _failed_order()
+
+    result = await scan(now=datetime.now(UTC))
+
+    assert result.order_recovery >= 1
+    assert result.errors == 0
+
+    async with unit_of_work() as conn:
+        opens = await opportunity_repo.list_by_status(conn, OpportunityStatus.OPEN)
+
+    match = next(o for o in opens if o.customer_id == customer_ref)
+    assert match.opportunity_type is OpportunityType.ORDER_RECOVERY
+    assert match.evidence["order_id"] == order_id
 
 
 async def test_rescan_creates_nothing(db: None) -> None:
