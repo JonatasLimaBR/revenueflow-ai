@@ -1,3 +1,4 @@
+from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
@@ -28,6 +29,12 @@ _GET = f"SELECT {_COLUMNS} FROM approval WHERE approval_id = %s"
 
 _LIST_BY_STATUS = f"""
 SELECT {_COLUMNS} FROM approval WHERE status = %s ORDER BY created_at
+"""
+
+_LIST_EXPIRED_PENDING = f"""
+SELECT {_COLUMNS} FROM approval
+ WHERE status = 'PENDING' AND expires_at IS NOT NULL AND expires_at < %s
+ ORDER BY created_at
 """
 
 _TRANSITION = """
@@ -90,6 +97,13 @@ async def get_by_turn(
 
 async def list_by_status(conn: AsyncConnection[Any], status: ApprovalStatus) -> list[Approval]:
     rows = await fetchall(conn, _LIST_BY_STATUS, (status.value,))
+    return [_to_approval(row) for row in rows]
+
+
+async def list_expired_pending(conn: AsyncConnection[Any], now: datetime) -> list[Approval]:
+    """PENDING approvals whose expires_at has already passed."""
+
+    rows = await fetchall(conn, _LIST_EXPIRED_PENDING, (now,))
     return [_to_approval(row) for row in rows]
 
 

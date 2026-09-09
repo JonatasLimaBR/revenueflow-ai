@@ -24,6 +24,11 @@ _DECISION_STATUS = {
     "approve": ApprovalStatus.APPROVED,
     "approve_with_override": ApprovalStatus.APPROVED,
     "reject": ApprovalStatus.REJECTED,
+    # Used by the expiration sweep (services.expiration) -- apply_decision_node
+    # (agents/apply_decision.py) already re-derives "expired" itself from
+    # approval.expires_at, ignoring whatever decision string arrives, so this
+    # only has to get the DB row into the right terminal status for auditing.
+    "expire": ApprovalStatus.EXPIRED,
 }
 
 

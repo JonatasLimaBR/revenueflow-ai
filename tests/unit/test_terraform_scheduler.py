@@ -2,7 +2,7 @@ from pathlib import Path
 
 _TF = Path(__file__).resolve().parents[2] / "infra" / "terraform"
 
-_JOBS = ("opportunity_scan", "campaign_run", "lead_sweep", "analytics_sync")
+_JOBS = ("opportunity_scan", "campaign_run", "lead_sweep", "analytics_sync", "expiration_sweep")
 
 
 def test_scheduler_service_account_declared() -> None:
@@ -10,10 +10,18 @@ def test_scheduler_service_account_declared() -> None:
     assert 'resource "google_service_account" "scheduler"' in body
 
 
-def test_all_four_batch_jobs_are_scheduled() -> None:
+def test_all_batch_jobs_are_scheduled() -> None:
     body = (_TF / "scheduler.tf").read_text()
     for job in _JOBS:
         assert f"{job} = {{" in body
+
+
+def test_expiration_sweep_runs_hourly_not_daily() -> None:
+    # Unlike the other jobs (once a day), a stale Approval/Quote/Handoff
+    # leaves a customer conversation stuck until this runs (ADR-077).
+    body = (_TF / "scheduler.tf").read_text()
+    schedule = body.split("expiration_sweep = {", 1)[1].split('schedule = "', 1)[1].split('"', 1)[0]
+    assert schedule == "0 * * * *"
 
 
 def test_scheduler_uses_its_own_service_account_not_the_app_one() -> None:
