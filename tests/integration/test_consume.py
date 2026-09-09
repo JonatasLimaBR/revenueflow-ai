@@ -98,3 +98,61 @@ async def test_session_in_handoff_short_circuits(db: None, outbound: FakeOutboun
 
     assert await process_event(env, outbound=outbound) is False
     assert len(outbound.sent) == 1
+
+
+async def test_resolved_handoff_does_not_leak_into_the_next_turn(
+    db: None, outbound: FakeOutbound
+) -> None:
+    # Found live (2026-09-09): the checkpointer merges state_in onto the
+    # persisted state, and `handoff` was only ever set True, never reset --
+    # once a thread handed off once, route_after_classify short-circuited to
+    # handoff_node on every later turn forever, even after the Handoff and
+    # the session were resolved (resolving only touches the DB, never the
+    # checkpoint's `handoff` key). A fresh turn must start its own routing
+    # decision from scratch.
+    from uuid import uuid4
+
+    from revenueflow.domain.models import SessionStatus
+    from revenueflow.repositories import session as session_repo
+    from revenueflow.repositories.db import unit_of_work
+
+    phone = f"+5511{uuid4().hex[:9]}"
+    handoff_env = make_envelope(
+        "message_received",
+        {
+            "event_id": "e-stale-1",
+            "occurred_at": "2026-08-29T12:00:00+00:00",
+            "phone": phone,
+            "message_id": "wamid.stale.1",
+            "message_type": "text",
+            "message_text": "quero falar com um atendente",
+        },
+        trace_id="t-stale-1",
+    )
+    assert await process_event(handoff_env, outbound=outbound) is True
+    assert "atendente humano" in outbound.sent[-1]["text"]
+
+    async with unit_of_work() as conn:
+        session_row = await fetchone(
+            conn, "SELECT conversation_id FROM conversation_session WHERE phone = %s", (phone,)
+        )
+        assert session_row is not None
+        await session_repo.update_status(conn, session_row["conversation_id"], SessionStatus.OPEN)
+
+    normal_env = make_envelope(
+        "message_received",
+        {
+            "event_id": "e-stale-2",
+            "occurred_at": "2026-08-29T12:05:00+00:00",
+            "phone": phone,
+            "message_id": "wamid.stale.2",
+            "message_type": "text",
+            "message_text": "quero uma bomba d'agua 1cv",
+        },
+        trace_id="t-stale-2",
+    )
+    assert await process_event(normal_env, outbound=outbound) is True
+
+    reply = outbound.sent[-1]["text"]
+    assert "atendente humano" not in reply
+    assert "1CV" in reply
