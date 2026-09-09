@@ -40,6 +40,10 @@ locals {
     # Service Networking / VPC Access APIs' own permissions.
     "roles/servicenetworking.networksAdmin", # servicenetworking.services.addPeering
     "roles/vpcaccess.admin",                 # vpcaccess.connectors.create
+    # Found live (2026-09-09, ADR-076): creating the 4 Cloud Scheduler jobs
+    # failed with 403 "lacks IAM permission cloudscheduler.jobs.create" —
+    # no prior role in this list covers Cloud Scheduler.
+    "roles/cloudscheduler.admin",
   ])
 }
 
