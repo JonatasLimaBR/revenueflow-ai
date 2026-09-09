@@ -34,7 +34,10 @@ llm = [
     "google-genai>=0.8",
 ]
 observability = [
-    "langfuse>=2.50",
+    # Found live (2026-09-09): langfuse 3.x/4.x removed Client.trace() --
+    # LangfuseTracer.__init__ (observability/tracer.py) uses that v2 API.
+    # Pinned to the v2 line, same mcp>=1.9,<2 pattern from ADR-070.
+    "langfuse>=2.50,<3",
     "opentelemetry-sdk>=1.27",
     "opentelemetry-exporter-gcp-trace>=1.7",
 ]

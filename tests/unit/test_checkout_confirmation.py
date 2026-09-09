@@ -11,6 +11,23 @@ _ACCEPT = [
     "confirmo",
     "confirmo o pedido",
     "fechado",
+    # Regression: real WhatsApp messages are punctuated in ways that used to
+    # break the plain substring match ("sim... pode, fechar" never matched
+    # "sim pode fechar" because the comma split the two halves) -- found
+    # live, the checkout gate kept re-prompting for confirmation.
+    "sim... pode, fechar!",
+    "Ok, pode fechar.",
+    "beleza, pode fechar!",
+    # Regression: natural phrasings outside the original short list.
+    "sim quero fechar",
+    "quero fechar o pedido",
+    "confirmado",
+    "confirma o pedido",
+    "pode confirmar",
+    "fecha o pedido",
+    "vamos fechar",
+    "pode processar o pedido",
+    "faz o pedido",
 ]
 _REJECT = [
     "acho que sim",
@@ -19,6 +36,7 @@ _REJECT = [
     "quanto fica o frete?",
     "quase isso, mas quero rever a quantidade",
     "nao, ainda estou pensando",
+    "sim, mas quanto fica o frete?",
 ]
 
 
