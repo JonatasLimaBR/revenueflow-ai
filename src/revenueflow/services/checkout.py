@@ -8,6 +8,7 @@ payment in one transaction, idempotent on ``quote_id``.
 
 from __future__ import annotations
 
+import re
 import unicodedata
 from datetime import datetime
 from decimal import Decimal
@@ -29,11 +30,23 @@ _ACCEPT = (
     "pode gerar o pedido",
     "confirmo o pedido",
     "confirmo",
+    "confirmado",
+    "confirma o pedido",
+    "pode confirmar",
     "fechado",
     "fechou negocio",
     "isso mesmo pode fechar",
+    "quero fechar o pedido",
+    "sim quero fechar",
+    "fecha o pedido",
+    "fechar o pedido",
+    "vamos fechar",
+    "pode processar o pedido",
+    "faz o pedido",
+    "manda fazer",
 )
 _REJECT_HINT = ("acho que", "talvez", "quase", "?", "nao ", "nao,", "nao.")
+_PUNCTUATION = re.compile(r"[^\w\s]")
 
 
 def _normalize(text: str) -> str:
@@ -47,7 +60,11 @@ def is_explicit_confirmation(text: str) -> bool:
     norm = _normalize(text).strip()
     if any(hint in norm for hint in _REJECT_HINT):
         return False
-    return any(phrase in norm for phrase in _ACCEPT)
+    # Real WhatsApp messages are punctuated ("sim, pode fechar!") in ways
+    # that break a plain substring match against _ACCEPT -- strip it AFTER
+    # the "?" reject check above (a question mark still has to reject).
+    clean = " ".join(_PUNCTUATION.sub(" ", norm).split())
+    return any(phrase in clean for phrase in _ACCEPT)
 
 
 def _first_result(state: dict[str, Any], tool: str) -> dict[str, Any] | None:
