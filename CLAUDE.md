@@ -321,6 +321,16 @@ Fatias entregues, arquivadas em `.claude/sdd/archive/`:
   automática). `0015` cria índices parciais em `approval`/`quote` pro sweep horário. **Sem**
   notificação quando um Handoff expira sem resolução humana, sem TTL configurável por
   conversa/cliente (ADR-077).
+- **WHATSAPP_OPT_IN** (2026-09-09, ADR-078) — fecha o follow-up documentado desde ACTIVE_SALES
+  (ADR-059): `consent_opt_in_at` nunca era populado por ninguém, então `campaign.run()` nunca de
+  fato contatava um cliente real. `policies/outbound_policy.py::is_opt_in` — mesmo padrão exato de
+  `is_opt_out` (match exato, não substring). Frase escolhida pelo usuário: **"ACEITO RECEBER
+  OFERTAS"** — deliberadamente específica; uma palavra curta como "aceito" sozinha colidiria com
+  aceitar uma proposta de negociação/preço (testado explicitamente: `test_is_opt_in_rejects_...`).
+  Guard simétrico em `worker/consume.py::process_event`, logo depois do guard de opt-out — grava
+  `consent_opt_in_at` (só quando `customer_id` já existe) e responde fixo, sem passar pelo grafo.
+  **Sem** pergunta proativa de opt-in em algum ponto do fluxo — a frase precisa ser comunicada ao
+  cliente por fora (campanha, landing page) pra virar utilizável na prática (ADR-078).
 
 Deploy: **auditoria em 2026-09-05 (ADR-069 a 072) achou que nenhum deploy real tinha rodado desde
 CUSTOMER_360 (2026-09-03)** — o ambiente GitHub `production` tem um gate de aprovação manual
@@ -786,3 +796,4 @@ Claude deve localizar e ler os documentos relacionados antes de implementar.
 - [ADR-075 — Langfuse self-hosted em produção (ADR-045 emendado)](docs/adrs/adr-075-langfuse-self-hosted-production.md)
 - [ADR-076 — Cloud Scheduler encadeando os 4 jobs batch](docs/adrs/adr-076-cloud-scheduler-batch-jobs.md)
 - [ADR-077 — TTL de aprovações, propostas e handoffs pendentes](docs/adrs/adr-077-expiration-ttl-sweep.md)
+- [ADR-078 — Fluxo de opt-in via WhatsApp, simétrico ao guard de opt-out](docs/adrs/adr-078-whatsapp-opt-in-flow.md)

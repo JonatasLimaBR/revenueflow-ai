@@ -2,9 +2,11 @@
 
 ``evaluate`` is the whole gate: opt-out always wins, then explicit opt-in is
 required, then a frequency cap on top of that — pure, no I/O, ``now`` injected
-by the caller. ``is_opt_out`` is the companion guard for the inbound side: an
-exact-match (not substring) keyword check, so it never misfires on a sentence
-that merely contains one of the words.
+by the caller. ``is_opt_out``/``is_opt_in`` are the companion guards for the
+inbound side: an exact-match (not substring) keyword check, so they never
+misfire on a sentence that merely contains one of the words -- opt-in in
+particular has to stay unambiguous, since a bare "aceito" would otherwise
+collide with accepting a negotiated price (ADR-078).
 """
 
 from __future__ import annotations
@@ -15,6 +17,7 @@ from datetime import datetime, timedelta
 from revenueflow.domain.models import CampaignDecision, CampaignSkipReason
 
 OPT_OUT_KEYWORDS = frozenset({"parar", "sair", "cancelar", "descadastrar"})
+OPT_IN_KEYWORDS = frozenset({"aceito receber ofertas"})
 
 
 def _normalize(text: str) -> str:
@@ -27,6 +30,13 @@ def is_opt_out(text: str) -> bool:
 
     normalized = _normalize(text).strip().rstrip(".!?")
     return normalized in OPT_OUT_KEYWORDS
+
+
+def is_opt_in(text: str) -> bool:
+    """Return True only when ``text`` IS the opt-in phrase, not merely contains it."""
+
+    normalized = _normalize(text).strip().rstrip(".!?")
+    return normalized in OPT_IN_KEYWORDS
 
 
 def evaluate(

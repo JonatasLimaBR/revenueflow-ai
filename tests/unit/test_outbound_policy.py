@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from revenueflow.domain.models import CampaignDecision, CampaignSkipReason
-from revenueflow.policies.outbound_policy import evaluate, is_opt_out
+from revenueflow.policies.outbound_policy import evaluate, is_opt_in, is_opt_out
 
 _NOW = datetime(2026, 9, 4, tzinfo=UTC)
 
@@ -85,6 +85,37 @@ def test_is_opt_out_matches_keyword_variants(text: str) -> None:
 )
 def test_is_opt_out_rejects_substring_and_unrelated_text(text: str) -> None:
     assert is_opt_out(text) is False
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "ACEITO RECEBER OFERTAS",
+        " Aceito receber ofertas ",
+        "aceito receber ofertas.",
+        "Aceito Receber Ofertas!",
+    ],
+)
+def test_is_opt_in_matches_keyword_variants(text: str) -> None:
+    assert is_opt_in(text) is True
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "aceito",
+        "aceito a proposta",
+        "sim, aceito o desconto",
+        "quero receber o pedido",
+        "concordo",
+        "",
+    ],
+)
+def test_is_opt_in_rejects_substring_and_unrelated_text(text: str) -> None:
+    # In particular: a bare "aceito" (or "aceito <anything else>") must never
+    # be read as marketing consent -- it collides with accepting a
+    # negotiated price/discount (ADR-078).
+    assert is_opt_in(text) is False
 
 
 def test_outbound_policy_module_is_pure() -> None:
