@@ -6,7 +6,7 @@
   <meta http-equiv="Content-Security-Policy"
         content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; frame-ancestors 'none'">
   <meta name="description"
-        content="RevenueFlow AI — agente comercial B2B via WhatsApp sobre GCP e Vertex AI. LLM interpreta, um Policy Engine determinístico decide, a API executa. 25 fatias entregues, do webhook ao portal operacional.">
+        content="RevenueFlow AI — agente comercial B2B via WhatsApp sobre GCP e Vertex AI. LLM interpreta, um Policy Engine determinístico decide, a API executa. 28 fatias entregues, do webhook à venda ativa com opt-in.">
   <title>RevenueFlow AI</title>
   <link rel="stylesheet" href="assets/styles.css">
 </head>
@@ -42,11 +42,11 @@
       </div>
       <div class="stats">
         <div class="stat">
-          <span class="stat__value">25</span>
+          <span class="stat__value">28</span>
           <span class="stat__label">fatias entregues</span>
         </div>
         <div class="stat">
-          <span class="stat__value">75</span>
+          <span class="stat__value">78</span>
           <span class="stat__label">ADRs documentados</span>
         </div>
         <div class="stat">
@@ -65,7 +65,7 @@
     <div class="container">
       <div class="section__head">
         <span class="eyebrow">Do webhook ao portal operacional</span>
-        <h2 id="fases-title">Nove fases, vinte e cinco fatias, uma jornada comercial completa</h2>
+        <h2 id="fases-title">Dez fases, vinte e oito fatias, uma jornada comercial completa</h2>
         <p>
           Cada fatia foi entregue com o ciclo completo do projeto — Brainstorm, Define, Design,
           Build, Ship — e mergeada em <code>main</code> só depois de todos os checks do CI
@@ -275,6 +275,30 @@
           </div>
         </article>
 
+        <article class="phase">
+          <div class="phase__head">
+            <span class="phase__num" aria-hidden="true">10</span>
+            <div class="phase__title-group">
+              <h3>Operação &amp; Compliance</h3>
+              <p>Os jobs em lote passam a rodar sozinhos, conversas presas esperando decisão humana se destravam sozinhas, e o consentimento de contato ativo vira algo que o próprio cliente confirma pelo WhatsApp.</p>
+            </div>
+          </div>
+          <div class="slice-grid">
+            <div class="slice">
+              <span class="slice__name">CLOUD_SCHEDULER_JOBS</span>
+              <p>Os 4 jobs em lote (detecção de oportunidade, venda ativa, lead lifecycle, analytics) que só rodavam sob demanda agora têm um <strong>Cloud Scheduler</strong> encadeado — detecção primeiro, venda ativa 30 minutos depois, consumindo as oportunidades recém-detectadas.</p>
+            </div>
+            <div class="slice">
+              <span class="slice__name">EXPIRATION_TTL_SWEEP</span>
+              <p>Aprovação, proposta ou transferência pra humano que ninguém decide a tempo <strong>expira sozinha, de hora em hora</strong> — a conversa nunca mais fica presa esperando uma decisão que não vem, seja de desconto, de preço vencido ou de atendimento humano.</p>
+            </div>
+            <div class="slice">
+              <span class="slice__name">WHATSAPP_OPT_IN</span>
+              <p>Responder <strong>"ACEITO RECEBER OFERTAS"</strong> registra consentimento de contato ativo — simétrico ao <code>PARAR</code> que já existia pro opt-out, mesma regra determinística, sem passar pelo modelo.</p>
+            </div>
+          </div>
+        </article>
+
       </div>
     </div>
   </section>
@@ -435,7 +459,7 @@
     <div class="container">
       <div class="section__head">
         <span class="eyebrow">O que vem a seguir</span>
-        <h2 id="roadmap-title">O roadmap não para nas 25 fatias entregues</h2>
+        <h2 id="roadmap-title">O roadmap não para nas 28 fatias entregues</h2>
         <p>Cada item abaixo é uma decisão já registrada em ADR — não uma promessa vaga de "em breve".</p>
       </div>
 
@@ -443,25 +467,23 @@
         <div class="timeline__item timeline__item--done">
           <span class="timeline__dot" aria-hidden="true"></span>
           <span class="timeline__tag">Você está aqui</span>
-          <h4>LANGFUSE_SELF_HOSTED <code>ADR-075</code></h4>
-          <p>Langfuse self-hosted em produção — banco próprio, IP privado via VPC connector, subdomínio fixo. Onboarding manual em andamento: 1ª conta admin, par de API keys, e então <code>TRACER_SINK</code> vira <code>langfuse</code>.</p>
+          <h4>WHATSAPP_OPT_IN <code>ADR-078</code></h4>
+          <p>Fluxo de opt-in via WhatsApp, simétrico ao guard de opt-out já em produção — responder "ACEITO RECEBER OFERTAS" registra consentimento, sem passar pelo modelo.</p>
         </div>
         <div class="timeline__item">
           <span class="timeline__dot" aria-hidden="true"></span>
           <span class="timeline__tag">Próxima fatia</span>
-          <h4>TTL de aprovações, propostas e handoffs</h4>
-          <p>Rotina de expiração automática pra tudo que fica pendente de decisão humana — hoje só a <code>Approval</code> tem <code>expires_at</code>; <code>Quote</code> e <code>Handoff</code> ainda não.</p>
+          <h4>Os 6 tipos de oportunidade do PRD-010</h4>
+          <p>Hoje só 2 de 6 tipos de oportunidade rodam em produção (recompra atrasada e proposta parada) — faltam 4 regras determinísticas novas no Opportunity Engine.</p>
         </div>
       </div>
 
       <div class="followups">
         <h4>Follow-ups já documentados nos ADRs</h4>
         <ul>
-          <li>Cloud Scheduler encadeando os jobs de detecção de oportunidade e campanha (hoje rodam sob demanda)</li>
           <li>WhatsApp Message Templates (HSM) aprovados pela Meta para contato fora da janela de 24h</li>
-          <li>Fluxo de opt-in via WhatsApp, simétrico ao guard de opt-out já em produção</li>
-          <li>Os 6 tipos de oportunidade do PRD-010 ainda não implementados (hoje: recompra atrasada e proposta parada)</li>
-          <li>Popular <code>consent_opt_in_at</code> de clientes reais (deferido até o cliente responder no WhatsApp)</li>
+          <li>Popular <code>consent_opt_in_at</code> de clientes reais (o mecanismo de opt-in já existe — falta clientes reais responderem)</li>
+          <li>Notificação quando um Handoff expira sem resolução humana (hoje só devolve a conversa pro agente automático, silenciosamente)</li>
           <li>Dashboard/Looker Studio sobre as views de Analytics 360 (o dado já existe, a visualização ainda não)</li>
         </ul>
       </div>

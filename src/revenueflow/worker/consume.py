@@ -46,6 +46,10 @@ _SLOW_REPLY = (
 _OPT_OUT_CONFIRMED = (
     "Voce nao recebera mais contatos de campanha. Para duvidas, siga escrevendo normalmente."
 )
+_OPT_IN_CONFIRMED = (
+    "Cadastro confirmado! Voce pode receber ofertas e novidades por aqui. "
+    "Para parar, responda PARAR a qualquer momento."
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -178,6 +182,16 @@ async def process_event(
                 session.conversation_id, envelope.event_id, phone, _OPT_OUT_CONFIRMED, outbound
             )
             get_tracer().end(outcome="opted_out")
+            return True
+
+        if outbound_policy.is_opt_in(text):
+            if customer_id is not None:
+                async with unit_of_work() as conn:
+                    await customer_repo.set_consent_opt_in(conn, customer_id, datetime.now(UTC))
+            await _send_once(
+                session.conversation_id, envelope.event_id, phone, _OPT_IN_CONFIRMED, outbound
+            )
+            get_tracer().end(outcome="opted_in")
             return True
 
         state_in: dict[str, Any] = {
