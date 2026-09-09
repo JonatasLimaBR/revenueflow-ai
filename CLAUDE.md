@@ -275,7 +275,31 @@ Fatias entregues, arquivadas em `.claude/sdd/archive/`:
   `tfvars` separada, só depois do passo manual. `AUTH_DISABLE_SIGNUP` controlado por
   `var.langfuse_disable_signup` (default `false`, signup aberto até a 1ª conta admin existir).
   **Sem** automatizar a conta admin/API keys via Terraform, sem instância Cloud SQL dedicada
-  (ADR-075).
+  (ADR-075). **Mais 3 correções pós-merge até o deploy real ter sucesso**: nome do VPC connector
+  excedia o limite de 25 caracteres do GCP (`lf` no lugar de `langfuse`); a API do GCP rejeita
+  criar o connector sem `max_instances`/`max_throughput` explícito (`min_instances=2`/
+  `max_instances=3`); e um connector ficou órfão em estado `ERROR` depois de uma tentativa que
+  falhou a meio caminho — `terraform apply` não registrou o ID no state, então a tentativa seguinte
+  colidiu com `409 already exists`; resolvido deletando o recurso quebrado manualmente
+  (`gcloud compute networks vpc-access connectors delete`) antes de reaplicar. **Incidente
+  paralelo**: adicionar o 4º domínio (`langfuse.mastavista.com.br`) ao certificado gerenciado o
+  recriou (campo imutável) e tirou `mastavista.com.br`/`mcp.`/`portal.` do ar por ~40 min — o
+  certificado só fica `ACTIVE` (e só então o Load Balancer o usa) quando **todos** os domínios
+  validam, não domínio a domínio; o novo precisava de um registro DNS A que ainda não existia.
+  Lição: ao adicionar um domínio a um certificado gerenciado multi-domínio já em uso, confirmar o
+  DNS do domínio novo **antes** do apply, não depois — o ADR-074 já documentava aceitar a janela de
+  reprovisionamento, mas presumia que todo domínio já tinha DNS pronto.
+- **CLOUD_SCHEDULER_JOBS** (2026-09-08, ADR-076) — fecha o follow-up documentado desde
+  OPPORTUNITY_ENGINE/ACTIVE_SALES/ANALYTICS/LEAD_LIFECYCLE (cada um mencionava Cloud Scheduler como
+  pendência, nunca implementado). `infra/terraform/scheduler.tf` (novo): 4 `google_cloud_scheduler_job`
+  (padrão oficial GCP pra Cloud Run Job — `http_target` na API v1 de Jobs + `oauth_token`), 1 por
+  `opportunity_scan`/`campaign_run`/`lead_sweep`/`analytics_sync`, com uma service account dedicada
+  (`revenueflow-api-scheduler`, ADR-008 least privilege — só `roles/run.invoker` nos 4 Jobs, nunca a
+  SA de runtime da própria API). Horários encadeados: `opportunity_scan` 09:00 UTC, `lead_sweep`
+  09:15 UTC, `campaign_run` 09:30 UTC (30 min de folga pra consumir as oportunidades que o scan
+  acabou de gerar — Cloud Scheduler não tem "rodar depois que X terminar" nativo),
+  `analytics_sync` 22:00 UTC. **Sem** orquestração explícita de dependência (Cloud Workflows) —
+  a folga de horário é suficiente pro volume atual.
 
 Deploy: **auditoria em 2026-09-05 (ADR-069 a 072) achou que nenhum deploy real tinha rodado desde
 CUSTOMER_360 (2026-09-03)** — o ambiente GitHub `production` tem um gate de aprovação manual
@@ -737,3 +761,4 @@ Claude deve localizar e ler os documentos relacionados antes de implementar.
 - [ADR-073 — Portal operacional: Google Sign-In + wrapper sobre rotas internas + painel ao vivo via Postgres LISTEN/NOTIFY](docs/adrs/adr-073-operational-portal.md)
 - [ADR-074 — Subdomínios mcp./portal. via Serverless NEG no mesmo Load Balancer (ADR-068 estendido)](docs/adrs/adr-074-mcp-and-portal-subdomains.md)
 - [ADR-075 — Langfuse self-hosted em produção (ADR-045 emendado)](docs/adrs/adr-075-langfuse-self-hosted-production.md)
+- [ADR-076 — Cloud Scheduler encadeando os 4 jobs batch](docs/adrs/adr-076-cloud-scheduler-batch-jobs.md)
