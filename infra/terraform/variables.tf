@@ -41,7 +41,10 @@ variable "max_instances" {
 variable "tracer_sink" {
   type        = string
   description = "Observability sink: noop | otel | langfuse"
-  default     = "noop"
+  # ADR-045/075: production points at self-hosted Langfuse once the manual
+  # bootstrap (1st admin account, org/project, API key pair, secrets
+  # populated) is done -- confirmed 2026-09-09.
+  default = "langfuse"
 
   validation {
     condition     = contains(["noop", "otel", "langfuse"], var.tracer_sink)
@@ -70,7 +73,9 @@ variable "langfuse_host" {
 variable "langfuse_disable_signup" {
   type        = bool
   description = "Locks down Langfuse's self-service signup once the first admin account exists; false (open signup) until then"
-  default     = false
+  # First admin account + org/project + API key pair confirmed 2026-09-09 —
+  # no reason to leave signup open to the public internet from here on.
+  default = true
 }
 
 variable "billing_account" {
