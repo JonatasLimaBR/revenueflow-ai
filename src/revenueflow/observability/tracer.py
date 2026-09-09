@@ -8,6 +8,7 @@ inside ``__init__`` so importing this module never requires the optional
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from collections.abc import Iterator, Mapping
@@ -203,6 +204,9 @@ class _LangfuseGeneration:
             _LOGGER.warning("langfuse generation end failed", exc_info=True)
 
 
+_LANGFUSE_FLUSH_TIMEOUT_S = 5.0
+
+
 class LangfuseTracer:
     """Sink that writes traces to a self-hosted Langfuse instance."""
 
@@ -276,7 +280,22 @@ class LangfuseTracer:
             _LOGGER.warning("langfuse trace end failed", exc_info=True)
 
     async def flush(self) -> None:
-        return None
+        # Found live (2026-09-09): a bare `return None` here meant the SDK's
+        # internal event queue was never explicitly flushed. A fresh client
+        # is built every turn (no cross-turn reuse), and Cloud Run only
+        # allocates CPU during active request handling by default -- the
+        # SDK's own background sender rarely got a chance to run before the
+        # client was abandoned, so traces silently never reached the server
+        # (confirmed: zero /api/public/ingestion hits despite real turns).
+        # `Langfuse.flush()` is a synchronous, blocking call by design (its
+        # own docstring: "should be called when the application shuts
+        # down") -- exactly this per-turn client's situation.
+        try:
+            await asyncio.wait_for(
+                asyncio.to_thread(self._client.flush), timeout=_LANGFUSE_FLUSH_TIMEOUT_S
+            )
+        except Exception:
+            _LOGGER.warning("langfuse client flush failed", exc_info=True)
 
 
 class _OTelSpan:
