@@ -379,6 +379,18 @@ zero. Teste de regressão em `tests/integration/test_consume.py::test_resolved_h
 `process_approval_decided` não tem esse risco (retoma via `Command(resume=...)` dentro do próprio
 `interrupt()`, não reentra por `route_after_classify`). Nenhuma migração/infra nova.
 
+**Incidente 2026-09-09 nº3**: mesmo com `min_instance_count=1` (item 1 acima) já em produção,
+Langfuse continuou sem dados — logs do serviço `revenueflow-api-langfuse` mostravam zero hits em
+`/api/public/ingestion` apesar de `revenueflow-api` seguir logando "Unexpected error occurred"
+(mensagem genérica do próprio SDK do Langfuse). Causa raiz: `LangfuseTracer.flush()`
+(`observability/tracer.py`) era um `return None` vazio — nunca chamava o `flush()` real e síncrono
+do cliente do SDK (documentado como "deve ser chamado quando a aplicação encerra"). Como um cliente
+`Langfuse` novo é construído a cada turno (sem reuso entre turnos) e o Cloud Run só aloca CPU
+durante o processamento ativo da requisição por padrão, o flush de fundo do próprio SDK raramente
+tinha chance de rodar antes do cliente daquele turno ser descartado. Corrigido chamando
+`self._client.flush()` via `asyncio.to_thread` com timeout de 5s (nunca propaga erro pro turno).
+Testes novos em `tests/unit/test_tracer.py` (chama o client real, engole erro, respeita timeout).
+
 Deploy: **auditoria em 2026-09-05 (ADR-069 a 072) achou que nenhum deploy real tinha rodado desde
 CUSTOMER_360 (2026-09-03)** — o ambiente GitHub `production` tem um gate de aprovação manual
 (`required_reviewers`) que ficou parado por 17 deploys seguidos sem ninguém aprovar. Quando
