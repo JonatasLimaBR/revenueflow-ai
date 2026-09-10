@@ -200,6 +200,15 @@ async def process_event(
             "customer_id": customer_id,
             "lead_id": lead_id,
             "turn_id": envelope.event_id,
+            # Found live (2026-09-09): the checkpointer merges state_in onto
+            # the persisted checkpoint, and `handoff` is only ever set to
+            # True (never reset) -- once any single turn on a thread hands
+            # off, route_after_classify short-circuits to handoff_node on
+            # every subsequent turn forever, regardless of that turn's own
+            # classification, even after the Handoff/session are resolved
+            # (resolving only touches the DB, never this checkpoint key).
+            # Every fresh turn starts its own routing decision from scratch.
+            "handoff": False,
         }
         result = await asyncio.wait_for(
             get_graph().ainvoke(state_in, config=config),

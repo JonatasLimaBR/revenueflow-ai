@@ -355,17 +355,41 @@ mensagens triviais de produto. Investigados juntos:
    requisição sequer chegar no serviço (zero hits em `/api/public/ingestion` nos logs, apesar de
    turnos reais rodando). Corrigido com `min_instance_count=1` (mesmo ajuste do portal, mesma
    classe de motivo — dependência chamada por turno não tolera cold start).
-2. **Handoff em mensagem trivial**: não era bug de código — `classify_intent_node` isola
-   `LLMError` corretamente (confirmado: nenhuma exceção não-tratada, `handoff_reason` real era
-   `explicit_request`, não `intent`). O Gemini genuinamente classificou mensagens como "Bomba
-   d'água centrífuga 1.5CV 220V" como `human_support` algumas vezes — reprodução local do mesmo
-   texto retornou a classificação correta. O prompt v2 (`services/prompts.py`) não dava nenhum
-   critério de precisão pra `human_support`, só listava o enum; `_INTENT_SYSTEM` v3 adiciona uma
-   cláusula explícita ("APENAS quando o cliente pedir explicitamente para falar com uma pessoa,
-   atendente ou humano") e `classify_intent_node` ganhou um log em INFO sempre que classificar
-   `human_support`, pra confirmar se o v3 reduz a taxa ou se acontecer de novo com evidência
-   melhor. Sem certeza absoluta de causa raiz (ruído de LLM não é 100% eliminável), mas o prompt
-   mais preciso e o logging novo são a mitigação disponível nesta fatia.
+2. **Handoff em mensagem trivial (diagnóstico inicial errado, corrigido no mesmo dia — ver
+   Incidente 2026-09-09 nº2 abaixo)**: a hipótese original era ruído do Gemini classificando
+   `human_support` por engano; o prompt v3 (`_INTENT_SYSTEM`) e o log de `classify_intent_node`
+   foram mantidos como hardening (mensagem mais precisa e observabilidade melhor não fazem mal),
+   mas a causa raiz real era outra — um bug de roteamento no grafo, achado horas depois quando o
+   problema voltou mesmo com o prompt v3 já em produção.
+
+**Incidente 2026-09-09 nº2**: o mesmo sintoma ("manda tudo pra atendimento humano") voltou depois
+do prompt v3 já estar em produção, e desta vez o log novo de `classify_intent_node` **não disparou
+nenhuma das duas linhas** (nem `human_support`, nem `LLMError`) — prova de que a classificação
+rodou normal e correta (`context.intent` do Handoff persistido confirmava `product_search`), mas o
+turno foi pro handoff mesmo assim. Causa raiz real: `route_after_classify` decide handoff olhando
+`state.get("handoff")`, e esse campo só é setado `True` (por `to_handoff()`/`handoff_node`) — nunca
+resetado. Como o checkpointer do LangGraph mescla `state_in` no estado já persistido do `thread_id`,
+uma vez que qualquer turno setasse `handoff=True`, **todo turno seguinte naquela conversa caía
+direto no `handoff_node` de novo, pra sempre** — mesmo depois do Handoff e da sessão serem
+resolvidos administrativamente (resolver só toca `handoff.status`/`conversation_session.status` no
+banco, nunca essa chave do checkpoint). Corrigido incluindo `"handoff": False` no `state_in` de
+`worker/consume.py::process_event` — cada turno novo começa sua própria decisão de roteamento do
+zero. Teste de regressão em `tests/integration/test_consume.py::test_resolved_handoff_does_not_leak_into_the_next_turn`
+(handoff → resolve administrativo → mensagem normal → confirma que NÃO cai em handoff de novo).
+`process_approval_decided` não tem esse risco (retoma via `Command(resume=...)` dentro do próprio
+`interrupt()`, não reentra por `route_after_classify`). Nenhuma migração/infra nova.
+
+**Incidente 2026-09-09 nº3**: mesmo com `min_instance_count=1` (item 1 acima) já em produção,
+Langfuse continuou sem dados — logs do serviço `revenueflow-api-langfuse` mostravam zero hits em
+`/api/public/ingestion` apesar de `revenueflow-api` seguir logando "Unexpected error occurred"
+(mensagem genérica do próprio SDK do Langfuse). Causa raiz: `LangfuseTracer.flush()`
+(`observability/tracer.py`) era um `return None` vazio — nunca chamava o `flush()` real e síncrono
+do cliente do SDK (documentado como "deve ser chamado quando a aplicação encerra"). Como um cliente
+`Langfuse` novo é construído a cada turno (sem reuso entre turnos) e o Cloud Run só aloca CPU
+durante o processamento ativo da requisição por padrão, o flush de fundo do próprio SDK raramente
+tinha chance de rodar antes do cliente daquele turno ser descartado. Corrigido chamando
+`self._client.flush()` via `asyncio.to_thread` com timeout de 5s (nunca propaga erro pro turno).
+Testes novos em `tests/unit/test_tracer.py` (chama o client real, engole erro, respeita timeout).
 
 Deploy: **auditoria em 2026-09-05 (ADR-069 a 072) achou que nenhum deploy real tinha rodado desde
 CUSTOMER_360 (2026-09-03)** — o ambiente GitHub `production` tem um gate de aprovação manual
