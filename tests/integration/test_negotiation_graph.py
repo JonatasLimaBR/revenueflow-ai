@@ -15,6 +15,7 @@ _OUT_OF_POLICY = "qual o preço da bomba com 40% de desconto?"
 _OUT_OF_POLICY_TARGET = "qual o preço da bomba? faz por R$ 1?"
 _QTY_FOLLOWUP = "qual o preço da bomba para 3 unidades?"
 _QUOTE_FOLLOWUP = "quero um orçamento"
+_QTY_NO_UNIT_WORD = "qual o preço da bomba? quero 10"
 
 
 async def test_in_policy_discount_is_proposed_without_approval(db: None) -> None:
@@ -35,6 +36,28 @@ async def test_in_policy_discount_is_proposed_without_approval(db: None) -> None
     assert result["final_outcome"] in {"proposed", "quoted"}
     assert "__interrupt__" not in result
     assert result["requested_quantity"] >= 1
+
+
+async def test_quantity_without_a_unit_word_is_not_silently_dropped_to_one(db: None) -> None:
+    # Found live (2026-09-11): a customer asking for a quantity almost never
+    # says "10 unidades" -- "quero 10" was silently read as no quantity at all,
+    # and negotiation_node defaulted to 1 un instead of what was actually
+    # asked, so the order the customer meant to close never matched what they
+    # asked for.
+    compiled = build_graph(MemorySaver())
+    conversation_id = f"c-neg-qty-no-unit-{uuid4().hex}"
+    turn_id = f"t-{uuid4().hex}"
+
+    result = await compiled.ainvoke(
+        {
+            "conversation_id": conversation_id,
+            "customer_text": _QTY_NO_UNIT_WORD,
+            "turn_id": turn_id,
+        },
+        config={"configurable": {"thread_id": conversation_id}},
+    )
+
+    assert result["requested_quantity"] == 10
     assert "checkout_discount" in result
 
     async with read_connection() as conn:

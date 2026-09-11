@@ -24,7 +24,25 @@ _NUMBER_WORDS: dict[str, int] = {
 
 _PERCENT_DIGITS = re.compile(r"(\d{1,2})\s*(?:%|por\s*cento)")
 _PERCENT_WORDS = re.compile(r"\b(cinco|dez|quinze|vinte|trinta)\s*(?:%|por\s*cento)")
-_QUANTITY = re.compile(r"(\d{1,5})\s*(?:un|unidades|pe[çc]as|caixas)")
+
+# The unit-suffixed form ("50 unidades") is the unambiguous, always-tried-first
+# case. Found live (2026-09-11): a customer almost never phrases quantity that
+# way in practice -- "quero 10", "manda 10", or a bare "10" replying to "quantas
+# você quer?" all fell through to `quantity=None`, silently defaulting to 1 un
+# in `negotiation_node` while the customer thought they'd negotiated for 10.
+# `_QUANTITY_VERB`/`_QUANTITY_BARE` cover those. The exclusion of a following
+# `%`/"por cento"/"reais" (so "quero 15%" or "quero 100 reais" are never
+# misread as a quantity of 15/100) is checked separately in `_quantity_match`,
+# not as a regex lookahead on `\d{1,5}` -- a lookahead there let the engine
+# backtrack the digit run itself (e.g. "quero 100 reais" matching "10" instead
+# of failing on "100"), which produced a wrong quantity instead of correctly
+# rejecting the match.
+_QUANTITY_UNIT = re.compile(r"(\d{1,5})\s*(?:un|unidades|pe[çc]as|caixas)")
+_QUANTITY_VERB = re.compile(
+    r"(?:quero|preciso de|manda[r]?|leva[r]?|fecha[r]?|s[aã]o|vou levar)\s+(\d{1,5})"
+)
+_QUANTITY_VERB_EXCLUDE = re.compile(r"\s*(?:%|por\s*cento|reais?\b)")
+_QUANTITY_BARE = re.compile(r"^\s*(\d{1,5})\s*[.!?]?\s*$")
 
 _PRICE_NUMBER = r"\d{1,3}(?:\.\d{3})+(?:,\d{2})?|\d+(?:,\d{2})?"
 _ABSOLUTE_PRICE = re.compile(
@@ -70,6 +88,16 @@ def _target_price(lowered: str, quantity_span: tuple[int, int] | None) -> Decima
     return None
 
 
+def _quantity_match(lowered: str) -> re.Match[str] | None:
+    unit_match = _QUANTITY_UNIT.search(lowered)
+    if unit_match is not None:
+        return unit_match
+    verb_match = _QUANTITY_VERB.search(lowered)
+    if verb_match is not None and _QUANTITY_VERB_EXCLUDE.match(lowered, verb_match.end(1)):
+        verb_match = None
+    return verb_match or _QUANTITY_BARE.match(lowered)
+
+
 def extract_price_ask(text: str) -> PriceAsk:
     """Return the discount, absolute target price, and quantity found in ``text``."""
 
@@ -77,9 +105,9 @@ def extract_price_ask(text: str) -> PriceAsk:
 
     discount = _discount_fraction(lowered)
 
-    quantity_match = _QUANTITY.search(lowered)
+    quantity_match = _quantity_match(lowered)
     quantity = int(quantity_match.group(1)) if quantity_match is not None else None
-    quantity_span = quantity_match.span() if quantity_match is not None else None
+    quantity_span = quantity_match.span(1) if quantity_match is not None else None
 
     target_price = None if discount is not None else _target_price(lowered, quantity_span)
 
