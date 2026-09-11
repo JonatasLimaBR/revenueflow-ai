@@ -209,6 +209,21 @@ async def process_event(
             # (resolving only touches the DB, never this checkpoint key).
             # Every fresh turn starts its own routing decision from scratch.
             "handoff": False,
+            # Found live (2026-09-11): the exact same leak, one field over.
+            # `negotiation_node` sets `pending_approval_id` only when IT
+            # creates a fresh Approval; on every other branch (a plain quote,
+            # an in-policy discount, a clarify) it returns no such key, so
+            # the merge leaves whatever was already in the checkpoint --
+            # including a LONG-RESOLVED approval's id. `route_after_negotiation`
+            # then routes to `await_approval` off that stale truthy value on
+            # the next unrelated price question, re-opening `interrupt()`
+            # against an approval nobody can ever act on again -- the
+            # conversation gets stuck on "ainda esta em analise" with no
+            # Approval to decide (confirmed live: `apply_decision_node` never
+            # clears it either, so a resumed-and-resolved turn leaves it set
+            # too). Every fresh turn starts this routing decision from
+            # scratch, same as `handoff` above.
+            "pending_approval_id": None,
         }
         result = await asyncio.wait_for(
             get_graph().ainvoke(state_in, config=config),

@@ -156,3 +156,95 @@ async def test_resolved_handoff_does_not_leak_into_the_next_turn(
     reply = outbound.sent[-1]["text"]
     assert "atendente humano" not in reply
     assert "1CV" in reply
+
+
+async def test_resolved_approval_does_not_leak_into_the_next_turn(
+    db: None, outbound: FakeOutbound
+) -> None:
+    # Found live (2026-09-11): the exact same leak as the handoff flag above,
+    # one field over. `negotiation_node` sets `pending_approval_id` only when
+    # IT creates a fresh Approval; every other branch (a plain quote, an
+    # in-policy discount) returns no such key, so the checkpoint merge left a
+    # long-resolved approval's id in place. `route_after_negotiation` then
+    # routed to `await_approval` off that stale truthy value on the very next
+    # unrelated price question, reopening `interrupt()` against an approval
+    # nobody could ever act on again -- the conversation got stuck on "ainda
+    # esta em analise" forever, with no Approval left to decide.
+    from uuid import uuid4
+
+    from revenueflow.events import make_envelope
+    from revenueflow.repositories.db import fetchone, read_connection
+    from revenueflow.worker import get_graph, process_approval_decided
+
+    phone = f"+5511{uuid4().hex[:9]}"
+    out_of_policy_env = make_envelope(
+        "message_received",
+        {
+            "event_id": "e-appr-1",
+            "occurred_at": "2026-08-29T12:00:00+00:00",
+            "phone": phone,
+            "message_id": "wamid.appr.1",
+            "message_type": "text",
+            "message_text": "qual o preço da bomba com 40% de desconto?",
+        },
+        trace_id="t-appr-1",
+    )
+    assert await process_event(out_of_policy_env, outbound=outbound) is True
+
+    async with read_connection() as conn:
+        session_row = await fetchone(
+            conn, "SELECT conversation_id FROM conversation_session WHERE phone = %s", (phone,)
+        )
+        assert session_row is not None
+        conversation_id = session_row["conversation_id"]
+        approval_row = await fetchone(
+            conn,
+            "SELECT approval_id FROM approval WHERE conversation_id = %s",
+            (conversation_id,),
+        )
+    assert approval_row is not None
+
+    decided_env = make_envelope(
+        "approval_decided",
+        {
+            "approval_id": approval_row["approval_id"],
+            "conversation_id": conversation_id,
+            "decision": "reject",
+            "discount_pct": None,
+        },
+        trace_id="t-appr-decide",
+    )
+    assert await process_approval_decided(decided_env, outbound=outbound) is True
+
+    followup_env = make_envelope(
+        "message_received",
+        {
+            "event_id": "e-appr-2",
+            "occurred_at": "2026-08-29T12:05:00+00:00",
+            "phone": phone,
+            "message_id": "wamid.appr.2",
+            "message_type": "text",
+            "message_text": "qual o preço da bomba?",
+        },
+        trace_id="t-appr-2",
+    )
+    assert await process_event(followup_env, outbound=outbound) is True
+
+    config = {"configurable": {"thread_id": conversation_id}}
+    snapshot = await get_graph().aget_state(config)
+    assert "await_approval" not in (snapshot.next or ())
+
+    third_env = make_envelope(
+        "message_received",
+        {
+            "event_id": "e-appr-3",
+            "occurred_at": "2026-08-29T12:10:00+00:00",
+            "phone": phone,
+            "message_id": "wamid.appr.3",
+            "message_type": "text",
+            "message_text": "e a bomba de 2cv, qual o preço?",
+        },
+        trace_id="t-appr-3",
+    )
+    assert await process_event(third_env, outbound=outbound) is True
+    assert "esta em analise" not in outbound.sent[-1]["text"].lower()
