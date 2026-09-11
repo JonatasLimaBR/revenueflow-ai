@@ -2,6 +2,7 @@ from decimal import Decimal
 from functools import lru_cache
 from typing import Literal
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ChannelOutbound = Literal["fake", "real"]
@@ -69,6 +70,22 @@ class Settings(BaseSettings):
     langfuse_host: str = ""
     langfuse_public_key: str = ""
     langfuse_secret_key: str = ""
+
+    @field_validator("langfuse_host", "langfuse_public_key", "langfuse_secret_key", mode="before")
+    @classmethod
+    def _strip_langfuse_value(cls, value: str) -> str:
+        # Found live (2026-09-11): "Langfuse ainda sem dados" traced all the
+        # way down to `Illegal header value b'pk-lf-...\r\n'` -- the secret
+        # was stored with a trailing CRLF (almost certainly `echo` without
+        # `-n`, or a CRLF-terminated file, when the value was populated into
+        # Secret Manager). Python's http.client refuses to send a header
+        # value containing CR/LF, so the SDK's every request failed before
+        # it ever left the process -- with no structured status code, so it
+        # always surfaced as the SDK's generic "Unexpected error occurred",
+        # never anything actionable. Stripping here fixes it regardless of
+        # how the secret gets populated, without needing to touch the stored
+        # value itself.
+        return value.strip() if isinstance(value, str) else value
 
     whatsapp_verify_token: str = ""
     whatsapp_app_secret: str = ""
