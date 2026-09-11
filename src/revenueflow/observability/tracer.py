@@ -213,6 +213,13 @@ class LangfuseTracer:
     def __init__(self, *, conversation_id: str, turn_id: str) -> None:
         from langfuse import Langfuse
 
+        settings = get_settings()
+        self._client: Any = Langfuse(
+            host=settings.langfuse_host,
+            public_key=settings.langfuse_public_key,
+            secret_key=settings.langfuse_secret_key,
+        )
+
         # Found live (2026-09-11): the SDK's own background upload thread
         # catches every send failure and logs it through `logging.getLogger
         # ("langfuse")`, but the one line that carries the *real* exception
@@ -222,16 +229,18 @@ class LangfuseTracer:
         # production root level of INFO. That message is identical whether
         # the cause is a bad API key, a network failure, or anything else,
         # so every prior "still no data" investigation had no way to tell
-        # those apart. Force this one logger to DEBUG regardless of the
-        # app's root level so the next failure names its actual exception.
+        # those apart.
+        #
+        # This MUST run after `Langfuse(...)` above, not before: that
+        # constructor unconditionally does its own
+        # `logging.getLogger("langfuse").setLevel(...)` (DEBUG if the SDK's
+        # own `debug`/`LANGFUSE_DEBUG` flag is set, else WARNING) -- setting
+        # it first (2026-09-11's first attempt, PR #110) got silently
+        # clobbered right back to WARNING by the client's own __init__,
+        # which is why it shipped without ever producing a single DEBUG
+        # line. Setting it here, after construction, is the only order that
+        # sticks.
         logging.getLogger("langfuse").setLevel(logging.DEBUG)
-
-        settings = get_settings()
-        self._client: Any = Langfuse(
-            host=settings.langfuse_host,
-            public_key=settings.langfuse_public_key,
-            secret_key=settings.langfuse_secret_key,
-        )
         self.trace_id = turn_id
         self._trace: Any = self._client.trace(id=turn_id, session_id=conversation_id)
 
