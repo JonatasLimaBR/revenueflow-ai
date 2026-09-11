@@ -213,6 +213,19 @@ class LangfuseTracer:
     def __init__(self, *, conversation_id: str, turn_id: str) -> None:
         from langfuse import Langfuse
 
+        # Found live (2026-09-11): the SDK's own background upload thread
+        # catches every send failure and logs it through `logging.getLogger
+        # ("langfuse")`, but the one line that carries the *real* exception
+        # (`langfuse.parse_error.handle_exception` -> `log.debug(exception)`)
+        # is DEBUG-level -- only the generic, exception-type-blind
+        # "Unexpected error occurred..." (`log.error(...)`) ever cleared our
+        # production root level of INFO. That message is identical whether
+        # the cause is a bad API key, a network failure, or anything else,
+        # so every prior "still no data" investigation had no way to tell
+        # those apart. Force this one logger to DEBUG regardless of the
+        # app's root level so the next failure names its actual exception.
+        logging.getLogger("langfuse").setLevel(logging.DEBUG)
+
         settings = get_settings()
         self._client: Any = Langfuse(
             host=settings.langfuse_host,
